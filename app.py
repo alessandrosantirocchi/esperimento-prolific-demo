@@ -1,7 +1,7 @@
 """InstaLab: Instagram-inspired research-feed prototype for Streamlit.
 
 Customize the visual layout in styles.css, interactions in feed.js,
-and example posts/stimuli in posts.json. Demo events stay in session only.
+and example posts/stimuli in posts.json. Events are also committed to local SQLite.
 """
 
 from __future__ import annotations
@@ -11,10 +11,13 @@ import csv
 import io
 import json
 import random
+import sqlite3
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 import streamlit as st
+from event_store import save_events
 
 BASE = Path(__file__).resolve().parent
 st.set_page_config(
@@ -76,8 +79,9 @@ def load_frontend() -> tuple[str, str]:
 
 def export_csv(events: list[dict]) -> bytes:
     stream = io.StringIO()
-    columns = ["event_id", "participant_id", "event_type", "post_id",
-               "stimulus_id", "stimulus_type", "client_ts", "elapsed_ms", "details"]
+    columns = ["session_id", "event_id", "participant_id", "event_type", "post_id",
+               "stimulus_id", "stimulus_type", "client_ts", "server_received_ts",
+               "elapsed_ms", "details"]
     writer = csv.DictWriter(stream, fieldnames=columns)
     writer.writeheader()
     for event in events:
@@ -224,6 +228,8 @@ ordered_posts = [posts_by_id[post_id] for post_id in st.session_state.feed_post_
 if "feed_events" not in st.session_state:
     st.session_state.feed_events = []
     st.session_state.seen_event_ids = set()
+if "recording_session_id" not in st.session_state:
+    st.session_state.recording_session_id = str(uuid.uuid4())
 
 feed_component = st.components.v2.component(
     "instalab_social_feed",
@@ -247,28 +253,51 @@ response = feed_component(
     width="stretch",
 )
 
-# Store only newly received events (the v2 state contains the cumulative batch).
-# No database is configured in this demo: session data disappears after restart.
+# Acknowledge events in session state only after the database transaction commits.
 new_events = response.events or []
+pending_events = []
+pending_ids = set()
 for event in new_events:
     if not isinstance(event, dict):
         continue
     event_id = str(event.get("event_id", ""))
-    if not event_id or event_id in st.session_state.seen_event_ids:
+    if not event_id or event_id in st.session_state.seen_event_ids or event_id in pending_ids:
         continue
-    st.session_state.seen_event_ids.add(event_id)
+    pending_ids.add(event_id)
     event = dict(event)
+    event["session_id"] = st.session_state.recording_session_id
     event["participant_id"] = participant_id
     post = next((p for p in study.get("posts", []) if p.get("id") == event.get("post_id")), None)
     event["stimulus_id"] = post.get("stimulus_id", "") if post else ""
     event["stimulus_type"] = post.get("stimulus_type", "") if post else ""
     event["server_received_ts"] = datetime.now(timezone.utc).isoformat()
-    st.session_state.feed_events.append(event)
+    pending_events.append(event)
+
+try:
+    # Include consent and presentation order once, in the same durable batch.
+    if not st.session_state.get("recording_initialized", False):
+        pending_events.insert(0, {
+            "event_id": "session_started", "event_type": "session_started",
+            "session_id": st.session_state.recording_session_id,
+            "participant_id": participant_id,
+            "server_received_ts": datetime.now(timezone.utc).isoformat(),
+            "details": {"consent_accepted_at": st.session_state.intro_consent_accepted_at,
+                        "post_order": st.session_state.feed_post_order},
+        })
+    if pending_events:
+        save_events(st.session_state.recording_session_id, pending_events)
+        st.session_state.feed_events.extend(pending_events)
+        st.session_state.seen_event_ids.update(e["event_id"] for e in pending_events)
+        st.session_state.recording_initialized = True
+except (sqlite3.Error, OSError):
+    st.error("Non è stato possibile salvare le interazioni. Lascia aperta questa pagina e riprova.")
+    if st.button("Riprova il salvataggio"):
+        st.rerun()
 
 # Open ?preview=1 to inspect the research log without displaying it to participants.
 if str(st.query_params.get("preview", "0")) == "1":
     with st.expander("🔬 Pannello ricercatore — anteprima e log", expanded=True):
-        st.caption("I dati di questa versione sono temporanei: non usare per raccolte Prolific reali.")
+        st.caption("Gli eventi sono salvati nel database locale del server. Per conservarli dopo la ricreazione del server serve un disco persistente o un database esterno.")
         st.write(f"Partecipante: {participant_id} · Eventi: {len(st.session_state.feed_events)}")
         st.dataframe(st.session_state.feed_events, use_container_width=True, hide_index=True)
         st.download_button(

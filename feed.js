@@ -108,7 +108,6 @@ export default function (component) {
            <button class="icon-button ${isLiked?'liked':''}" data-action="like" data-post="${escape(p.id)}" aria-label="${isLiked?'Rimuovi mi piace':'Mi piace'}" aria-pressed="${isLiked}">${ico('heart',isLiked,28)}</button>
            <button class="icon-button" data-action="dislike" data-post="${escape(p.id)}" aria-label="${s.disliked.has(p.id)?'Rimuovi dislike':'Dislike'}" aria-pressed="${s.disliked.has(p.id)}"><span aria-hidden="true">👎</span></button>
            <button class="icon-button" data-action="open_comments" data-post="${escape(p.id)}" aria-label="Commenta">${ico('comment',false,27)}</button>
-           <button class="icon-button" data-action="share" data-post="${escape(p.id)}" aria-label="Condividi">${ico('message',false,27)}</button>
          </div>
          <button class="icon-button ${isSaved?'saved':''}" data-action="save" data-post="${escape(p.id)}" aria-label="${isSaved?'Rimuovi dai salvati':'Salva'}" aria-pressed="${isSaved}">${ico('bookmark',isSaved,27)}</button>
        </div>
@@ -139,10 +138,9 @@ export default function (component) {
       return `<div class="overlay" data-close-overlay="true"><div class="post-modal" role="dialog" aria-label="Post"><button class="modal-close" data-action="close">${ico('close')}</button>${post(p)}</div></div>`;
     }
     const p=postBy(s.overlayPost);
-    const title={share:'Condividi',post_more:'Opzioni del post',more:'Informazioni'}[s.overlay]||'Informazioni';
+    const title={post_more:'Opzioni del post',more:'Informazioni'}[s.overlay]||'Informazioni';
     return `<div class="overlay" data-close-overlay="true"><div class="simple-modal" role="dialog" aria-label="${title}"><h3>${title}</h3>
-      ${s.overlay==='share' ? `<p>Condividi questo post all'interno della simulazione.</p><button class="modal-option" data-action="copy_link" data-post="${escape(s.overlayPost)}">${ico('message',false,20)} Copia link simulato</button><button class="modal-option" data-action="send_demo" data-post="${escape(s.overlayPost)}">${ico('arrow',false,20)} Invia (simulazione)</button>` :
-        s.overlay==='post_more' ? `<button class="modal-option" data-action="save" data-post="${escape(s.overlayPost)}">${ico('bookmark',false,20)} Salva / Rimuovi dai salvati</button><button class="modal-option" data-action="copy_link" data-post="${escape(s.overlayPost)}">${ico('message',false,20)} Copia link simulato</button>` : '<p>InstaLab è un prototipo per esperimenti sulla percezione dei contenuti social. Nessun collegamento reale con Instagram.</p>'}
+      ${s.overlay==='post_more' ? `<button class="modal-option" data-action="save" data-post="${escape(s.overlayPost)}">${ico('bookmark',false,20)} Salva / Rimuovi dai salvati</button>` : '<p>InstaLab è un prototipo per esperimenti sulla percezione dei contenuti social. Nessun collegamento reale con Instagram.</p>'}
        <button class="cancel" data-action="close">Annulla</button></div></div>`;
   };
 
@@ -175,10 +173,8 @@ export default function (component) {
     else if(action==='profile') { signal('open_profile',null,{username:btn.dataset.user}); s.tab='profile';window.scrollTo(0,0); }
     else if(action==='story'){s.storyIndex=Number(btn.dataset.index)||0;s.overlay='story';signal('story_open',null,{username:stories[s.storyIndex]?.username});}
     else if(action==='next_story'){s.storyIndex=(s.storyIndex+1)%stories.length;signal('story_open',null,{username:stories[s.storyIndex]?.username});}
-    else if(action==='share'||action==='post_more'||action==='more'){s.overlay=action;s.overlayPost=id;if(id)signal('open_'+action,id);}
+    else if(action==='post_more'||action==='more'){s.overlay=action;s.overlayPost=id;if(id)signal('open_'+action,id);}
     else if(action==='open_post'){s.overlay='post';s.overlayPost=id;signal('open_post',id);}
-    else if(action==='copy_link'){const url=`https://example.invalid/demo-post/${encodeURIComponent(id)}`;if(navigator.clipboard?.writeText)navigator.clipboard.writeText(url).catch(()=>{});signal('copy_link',id,{simulated:true});s.overlay=null;}
-    else if(action==='send_demo'){signal('share_simulated',id);s.overlay=null;}
     else if(action==='close'){s.overlay=null;}
     else if(action==='more'){s.overlay='more';}
     render();
