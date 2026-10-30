@@ -1,235 +1,149 @@
-"""Streamlit + Prolific starter: a demo news-rating experiment.
+"""InstaLab: Instagram-inspired research-feed prototype for Streamlit.
 
-Deploy on Streamlit Community Cloud using requirements.txt.
-Demo mode works without credentials and does not save data remotely.
-Real Prolific sessions require configured Supabase secrets.
+Customize the visual layout in styles.css, interactions in feed.js,
+and example posts/stimuli in posts.json. Demo events stay in session only.
 """
 
 from __future__ import annotations
 
-import hashlib
+import base64
+import csv
+import io
 import json
-import secrets
 from datetime import datetime, timezone
-from uuid import uuid4
+from pathlib import Path
 
-import requests
 import streamlit as st
 
-
+BASE = Path(__file__).resolve().parent
 st.set_page_config(
-    page_title="Esperimento sulle notizie — Demo",
-    page_icon="📰",
-    layout="centered",
+    page_title="InstaLab | Social Feed Simulation",
+    page_icon="📷",
+    layout="wide",
+    initial_sidebar_state="collapsed",
 )
 
-# ONLY DEMONSTRATION STIMULI. Replace before running a real study.
-NEWS_ITEMS = [
-    {
-        "id": "N01",
-        "title": "Una biblioteca comunale sperimenta un orario di apertura esteso",
-        "text": "Secondo la notizia, la biblioteca starebbe valutando l'apertura serale "
-                "in alcuni giorni della settimana per favorire gli studenti.",
-        "source": "Notizie Locali — DEMO",
-    },
-    {
-        "id": "N02",
-        "title": "Un ateneo prova un sistema digitale per prenotare gli spazi studio",
-        "text": "Il progetto descritto prevede una piattaforma che permetterebbe agli "
-                "studenti di verificare la disponibilità delle postazioni.",
-        "source": "Campus Oggi — DEMO",
-    },
-    {
-        "id": "N03",
-        "title": "Una città avvia un progetto pilota per misurare i flussi di traffico",
-        "text": "L'amministrazione, secondo la notizia, intenderebbe usare sensori "
-                "per analizzare gli spostamenti nelle ore di maggiore affluenza.",
-        "source": "Città e Dati — DEMO",
-    },
-    {
-        "id": "N04",
-        "title": "Un museo annuncia visite serali in alcune date sperimentali",
-        "text": "La notizia presenta un calendario pilota di aperture serali "
-                "con percorsi guidati rivolti a un pubblico più ampio.",
-        "source": "Cultura Aperta — DEMO",
-    },
-]
+# Remove Streamlit visual chrome so the simulation fills the entire viewport.
+st.markdown(
+    """
+    <style>
+      .stApp { background: #fff; }
+      header[data-testid="stHeader"] { display: none; }
+      #MainMenu, footer, [data-testid="stDecoration"] { display: none !important; }
+      .block-container { max-width: none !important; padding: 0 !important; }
+      [data-testid="stMainBlockContainer"] { padding: 0 !important; }
+      div[data-testid="stVerticalBlock"] { gap: 0 !important; }
+      div[data-testid="stElementContainer"] { margin: 0 !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def secret(name: str) -> str:
-    """Read deployment secrets; support an unconfigured local/demo app."""
-    try:
-        value = st.secrets.get(name, "")
-    except (FileNotFoundError, KeyError):
+def local_image_data(filename: str) -> str:
+    """Serve only local JPEG/PNG/WEBP images from the repository root."""
+    candidate = BASE / str(filename)
+    if candidate.parent != BASE or candidate.suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"}:
         return ""
-    return str(value).strip() if value is not None else ""
+    if not candidate.is_file():
+        return ""
+    mime = {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".png": "image/png", ".webp": "image/webp",
+    }[candidate.suffix.lower()]
+    return f"data:{mime};base64,{base64.b64encode(candidate.read_bytes()).decode('ascii')}"
 
 
-def save_to_supabase(record: dict) -> None:
-    """Save only on Streamlit's server; never ship the secret key to users."""
-    url = secret("SUPABASE_URL").rstrip("/")
-    api_key = secret("SUPABASE_SECRET_KEY")
-    if not url or not api_key:
-        raise RuntimeError("Database non configurato nelle Secrets di Streamlit.")
-
-    endpoint = f"{url}/rest/v1/study_responses"
-    headers = {
-        "apikey": api_key,  # sb_secret_* keys are NOT JWT bearer tokens
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal",
-    }
-    response = requests.post(endpoint, json=record, headers=headers, timeout=15)
-    response.raise_for_status()
+@st.cache_data(show_spinner=False)
+def load_stimuli() -> dict:
+    raw = json.loads((BASE / "posts.json").read_text(encoding="utf-8"))
+    for post in raw.get("posts", []):
+        post["image_url"] = local_image_data(post.get("image", ""))
+        post["avatar_url"] = local_image_data(post.get("avatar", post.get("image", "")))
+    for story in raw.get("stories", []):
+        story["image_url"] = local_image_data(story.get("image", ""))
+    return raw
 
 
-query_pid = str(st.query_params.get("PROLIFIC_PID", "")).strip()
-query_study_id = str(st.query_params.get("STUDY_ID", "")).strip()
-query_session_id = str(st.query_params.get("SESSION_ID", "")).strip()
-
-# Preview without Prolific (or with a fake TEST* PID): not remotely saved.
-demo_mode = not query_pid or query_pid.upper().startswith("TEST")
-
-if "stage" not in st.session_state:
-    st.session_state.stage = "intro"
-if "demo_id" not in st.session_state:
-    st.session_state.demo_id = f"DEMO-{uuid4().hex[:10]}"
-if "condition" not in st.session_state:
-    if demo_mode:
-        st.session_state.condition = secrets.choice(("visible", "hidden"))
-    else:
-        # Stable allocation for the same participant in this demo (roughly 50/50).
-        digest = hashlib.sha256(f"demo-news-v1:{query_pid}".encode()).digest()
-        st.session_state.condition = ("visible", "hidden")[digest[0] % 2]
-
-st.title("Valutazione di notizie")
-st.caption("Prototipo sperimentale in Streamlit · 4 notizie dimostrative")
-
-if demo_mode:
-    st.info("**Modalità DEMO.** Puoi provare lo studio subito. I dati non vengono salvati online: alla fine puoi esportare un file JSON.")
-else:
-    st.caption("Sessione Prolific riconosciuta automaticamente.")
-    if not (secret("SUPABASE_URL") and secret("SUPABASE_SECRET_KEY")):
-        st.error("Il database dello studio non è ancora configurato. Non iniziare lo studio reale: contatta il ricercatore.")
-        st.stop()
-
-if st.session_state.stage == "intro":
-    st.subheader("Informazioni e consenso")
-    st.write(
-        "In questa dimostrazione ti saranno presentate quattro brevi notizie "
-        "inventate per verificare il funzionamento dell'interfaccia. "
-        "Per ciascuna notizia indicherai la credibilità percepita "
-        "e la probabilità che tu decida di leggerla."
+@st.cache_data(show_spinner=False)
+def load_frontend() -> tuple[str, str]:
+    return (
+        (BASE / "styles.css").read_text(encoding="utf-8"),
+        (BASE / "feed.js").read_text(encoding="utf-8"),
     )
-    st.write(
-        "In uno studio reale questa schermata deve essere sostituita "
-        "dalle informazioni approvate dal comitato etico: responsabili, "
-        "finalità, trattamento dati, contatti e diritto al ritiro."
-    )
-    consent = st.checkbox("Ho letto le informazioni e accetto di partecipare a questa prova.")
-    if st.button("Inizia la prova", type="primary", disabled=not consent, use_container_width=True):
-        st.session_state.started_at = now_iso()
-        st.session_state.stage = "task"
-        st.rerun()
 
-elif st.session_state.stage == "task":
-    st.progress(0.5, text="Compila le valutazioni e poi premi Invia risposte")
-    with st.form("news_form", clear_on_submit=False):
-        for index, item in enumerate(NEWS_ITEMS, start=1):
-            with st.container(border=True):
-                st.markdown(f"#### Notizia {index} di {len(NEWS_ITEMS)}")
-                if st.session_state.condition == "visible":
-                    st.caption(f"Fonte: {item['source']}")
-                st.write(f"**{item['title']}**")
-                st.write(item["text"])
-                st.radio(
-                    "Quanto ritieni credibile questa notizia? (1 = per niente, 7 = moltissimo)",
-                    options=list(range(1, 8)),
-                    index=None,
-                    horizontal=True,
-                    key=f"cred_{index}",
-                )
-                st.radio(
-                    "Quanto saresti propenso/a a cliccare per leggere l'articolo? (1–7)",
-                    options=list(range(1, 8)),
-                    index=None,
-                    horizontal=True,
-                    key=f"click_{index}",
-                )
-        submitted = st.form_submit_button("Invia risposte", type="primary", use_container_width=True)
 
-    if submitted:
-        incomplete = [i for i in range(1, len(NEWS_ITEMS) + 1)
-                      if st.session_state.get(f"cred_{i}") is None
-                      or st.session_state.get(f"click_{i}") is None]
-        if incomplete:
-            st.warning("Completa entrambe le valutazioni per tutte e quattro le notizie.")
-        else:
-            responses = [
-                {
-                    "item_id": item["id"],
-                    "credibility": st.session_state[f"cred_{i}"],
-                    "click_likelihood": st.session_state[f"click_{i}"],
-                }
-                for i, item in enumerate(NEWS_ITEMS, start=1)
-            ]
-            submitted_at = now_iso()
-            duration_seconds = int(
-                (datetime.fromisoformat(submitted_at)
-                 - datetime.fromisoformat(st.session_state.started_at)).total_seconds()
-            )
-            record = {
-                "response_key": (
-                    f"{query_study_id or 'STUDY'}:{query_session_id or query_pid}"
-                    if not demo_mode else st.session_state.demo_id
-                ),
-                "prolific_pid": query_pid if not demo_mode else st.session_state.demo_id,
-                "study_id": query_study_id or "DEMO-STUDY",
-                "prolific_session_id": query_session_id or None,
-                "condition": "source_visible" if st.session_state.condition == "visible" else "source_hidden",
-                "started_at": st.session_state.started_at,
-                "submitted_at": submitted_at,
-                "duration_seconds": duration_seconds,
-                "answers": responses,
-            }
-            st.session_state.record = record
-            if demo_mode:
-                st.session_state.stage = "done"
-                st.rerun()
-            else:
-                try:
-                    with st.spinner("Salvataggio delle risposte in corso..."):
-                        save_to_supabase(record)
-                except requests.HTTPError as error:
-                    if error.response is not None and error.response.status_code == 409:
-                        st.error("Una risposta con questo codice di sessione risulta già presente. Contatta il ricercatore prima di riprovare.")
-                    else:
-                        st.error("Impossibile salvare le risposte. Riprova oppure contatta il ricercatore.")
-                except (requests.RequestException, RuntimeError):
-                    st.error("Connessione al database non riuscita. Riprova: la partecipazione non è ancora registrata.")
-                else:
-                    st.session_state.stage = "done"
-                    st.rerun()
+def export_csv(events: list[dict]) -> bytes:
+    stream = io.StringIO()
+    columns = ["event_id", "participant_id", "event_type", "post_id",
+               "stimulus_id", "stimulus_type", "client_ts", "elapsed_ms", "details"]
+    writer = csv.DictWriter(stream, fieldnames=columns)
+    writer.writeheader()
+    for event in events:
+        writer.writerow({k: (
+            json.dumps(event.get(k, {}), ensure_ascii=False) if k == "details"
+            else event.get(k, "")
+        ) for k in columns})
+    return stream.getvalue().encode("utf-8-sig")
 
-elif st.session_state.stage == "done":
-    st.success("Prova completata. Grazie per la partecipazione!")
-    if demo_mode:
-        st.write("Puoi verificare i risultati prodotti in questa sessione:")
-        st.json(st.session_state.record, expanded=False)
+
+study = load_stimuli()
+css, js = load_frontend()
+participant_id = str(st.query_params.get("PROLIFIC_PID", "DEMO_SESSION"))
+
+if "feed_events" not in st.session_state:
+    st.session_state.feed_events = []
+    st.session_state.seen_event_ids = set()
+
+feed_component = st.components.v2.component(
+    "instalab_social_feed",
+    html='<div id="instalab-root" aria-label="Simulazione di social feed"></div>',
+    css=css,
+    js=js,
+    isolate_styles=True,
+)
+
+response = feed_component(
+    key="instalab_main_feed",
+    data={
+        "posts": study.get("posts", []),
+        "stories": study.get("stories", []),
+        "title": study.get("display_name", "InstaLab"),
+        "participant_id": participant_id,
+        "history": st.session_state.feed_events,
+    },
+    default={"events": []},
+    on_events_change=lambda: None,
+    width="stretch",
+)
+
+# Store only newly received events (the v2 state contains the cumulative batch).
+# No database is configured in this demo: session data disappears after restart.
+new_events = response.events or []
+for event in new_events:
+    if not isinstance(event, dict):
+        continue
+    event_id = str(event.get("event_id", ""))
+    if not event_id or event_id in st.session_state.seen_event_ids:
+        continue
+    st.session_state.seen_event_ids.add(event_id)
+    event = dict(event)
+    event["participant_id"] = participant_id
+    post = next((p for p in study.get("posts", []) if p.get("id") == event.get("post_id")), None)
+    event["stimulus_id"] = post.get("stimulus_id", "") if post else ""
+    event["stimulus_type"] = post.get("stimulus_type", "") if post else ""
+    event["server_received_ts"] = datetime.now(timezone.utc).isoformat()
+    st.session_state.feed_events.append(event)
+
+# Open ?preview=1 to inspect the research log without displaying it to participants.
+if str(st.query_params.get("preview", "0")) == "1":
+    with st.expander("🔬 Pannello ricercatore — anteprima e log", expanded=True):
+        st.caption("I dati di questa versione sono temporanei: non usare per raccolte Prolific reali.")
+        st.write(f"Partecipante: {participant_id} · Eventi: {len(st.session_state.feed_events)}")
+        st.dataframe(st.session_state.feed_events, use_container_width=True, hide_index=True)
         st.download_button(
-            "Scarica le risposte DEMO (JSON)",
-            data=json.dumps(st.session_state.record, ensure_ascii=False, indent=2),
-            file_name="risposte_demo.json",
-            mime="application/json",
-            use_container_width=True,
+            "Scarica interazioni CSV",
+            data=export_csv(st.session_state.feed_events),
+            file_name="instalab_interazioni_demo.csv",
+            mime="text/csv",
         )
-    else:
-        st.write("Le tue risposte sono state salvate.")
-        completion_url = secret("PROLIFIC_COMPLETION_URL")
-        if completion_url:
-            st.link_button("Torna su Prolific per completare lo studio", completion_url, type="primary", use_container_width=True)
-        else:
-            st.warning("URL di completamento Prolific non ancora impostato. Contatta il ricercatore per ricevere il codice di completamento.")

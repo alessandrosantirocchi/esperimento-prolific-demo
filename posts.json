@@ -1,0 +1,74 @@
+{
+  "study_title": "InstaLab · Social Feed Simulation",
+  "display_name": "InstaLab",
+  "stories": [
+    {"username": "your_story", "image": "demo_01.jpg", "own": true},
+    {"username": "aurora.frames", "image": "demo_01.jpg"},
+    {"username": "felix.daily", "image": "demo_02.jpg"},
+    {"username": "caffeecorner", "image": "demo_03.jpg"},
+    {"username": "discover.now", "image": "demo_04.jpg"},
+    {"username": "moment.archive", "image": "demo_01.jpg"},
+    {"username": "creative.lab", "image": "demo_03.jpg"}
+  ],
+  "posts": [
+    {
+      "id": "P001",
+      "stimulus_id": "DEMO001",
+      "stimulus_type": "demo",
+      "username": "aurora.frames",
+      "location": "Moments from today",
+      "image": "demo_01.jpg",
+      "avatar": "demo_01.jpg",
+      "verified": true,
+      "minutes_ago": 42,
+      "initial_likes": 1284,
+      "caption": "A moment worth remembering ✨ #everydaymoments",
+      "comments": [
+        {"username": "visual.story", "text": "Love this shot!"},
+        {"username": "discover.now", "text": "So beautiful ✨"}
+      ]
+    },
+    {
+      "id": "P002",
+      "stimulus_id": "DEMO002",
+      "stimulus_type": "demo",
+      "username": "felix.daily",
+      "location": "At home",
+      "image": "demo_02.jpg",
+      "avatar": "demo_02.jpg",
+      "verified": false,
+      "minutes_ago": 180,
+      "initial_likes": 842,
+      "caption": "Slow mornings, little moments. 🐈",
+      "comments": [{"username": "caffeecorner", "text": "Absolutely adorable!"}]
+    },
+    {
+      "id": "P003",
+      "stimulus_id": "DEMO003",
+      "stimulus_type": "demo",
+      "username": "caffeecorner",
+      "location": "Good morning",
+      "image": "demo_03.jpg",
+      "avatar": "demo_03.jpg",
+      "verified": false,
+      "minutes_ago": 375,
+      "initial_likes": 2301,
+      "caption": "Coffee first, then everything else. ☕ #coffeebreak",
+      "comments": [{"username": "felix.daily", "text": "This is the mood."}]
+    },
+    {
+      "id": "P004",
+      "stimulus_id": "DEMO004",
+      "stimulus_type": "demo",
+      "username": "discover.now",
+      "location": "Explore",
+      "image": "demo_04.jpg",
+      "avatar": "demo_04.jpg",
+      "verified": true,
+      "minutes_ago": 520,
+      "initial_likes": 5940,
+      "caption": "Sometimes the view changes everything. 🚀",
+      "comments": [{"username": "aurora.frames", "text": "Incredible view!"}]
+    }
+  ]
+}
