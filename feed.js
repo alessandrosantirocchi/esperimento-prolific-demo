@@ -41,11 +41,13 @@ export default function (component) {
   let s = root.__instalab_state;
   if (!s || s.participantId !== participantId) {
     s = { participantId, tab:'home', overlay:null, overlayPost:null, storyIndex:0, query:'',
-          liked:new Set(), saved:new Set(), followed:new Set(), comments:{}, expanded:new Set(),
+          liked:new Set(), disliked:new Set(), saved:new Set(), followed:new Set(), comments:{}, expanded:new Set(),
           events:history.slice(), started:Date.now(), seen:new Set() };
     for (const e of history) {
       if (e.event_type === 'like') s.liked.add(e.post_id);
       if (e.event_type === 'unlike') s.liked.delete(e.post_id);
+      if (e.event_type === 'dislike') s.disliked.add(e.post_id);
+      if (e.event_type === 'remove_dislike') s.disliked.delete(e.post_id);
       if (e.event_type === 'save') s.saved.add(e.post_id);
       if (e.event_type === 'unsave') s.saved.delete(e.post_id);
       if (e.event_type === 'follow') s.followed.add(e.details?.username);
@@ -57,6 +59,7 @@ export default function (component) {
     }
     root.__instalab_state = s;
   }
+  s.disliked ||= new Set();
 
   let observer;
   const signal = (type, postId=null, details={}) => {
@@ -87,6 +90,9 @@ export default function (component) {
     const isLiked = s.liked.has(p.id), isSaved = s.saved.has(p.id);
     const list = [...(p.comments || []), ...(s.comments[p.id] || [])];
     const shown = s.expanded.has(p.id) ? list : list.slice(-2);
+    // Display one source-sheet tile without modifying the original stimulus.
+    const region = p.image_region;
+    const imageStyle = region ? `position:absolute;max-width:none;width:${region.source_width/region.width*100}%;height:auto;left:${-region.x/region.width*100}%;top:${-region.y/region.height*100}%;` : `object-position:${escape(p.image_position || 'center')};`;
     return `<article class="post" data-post="${escape(p.id)}">
        <header class="post-header">
          <button class="avatar-button" data-action="profile" data-user="${escape(p.username)}">${profileAvatar(p.avatar_url)}</button>
@@ -94,12 +100,13 @@ export default function (component) {
          <button class="icon-button options" data-action="post_more" data-post="${escape(p.id)}" aria-label="Opzioni">${ico('more')}</button>
        </header>
        <div class="photo-wrap" data-doublepost="${escape(p.id)}">
-          ${p.image_url?`<img class="post-photo" loading="lazy" src="${escape(p.image_url)}" alt="Foto del post di ${escape(p.username)}" />`:'<div class="photo-placeholder">Carica uno stimolo in posts.json</div>'}
+          ${p.image_url?`<img class="post-photo" style="${imageStyle}" loading="lazy" src="${escape(p.image_url)}" alt="Foto del post di ${escape(p.username)}" />`:'<div class="photo-placeholder">Carica uno stimolo in posts.json</div>'}
           <div class="burst-heart">${ico('heart',true,105)}</div>
        </div>
        <div class="post-actions">
          <div class="post-actions-left">
            <button class="icon-button ${isLiked?'liked':''}" data-action="like" data-post="${escape(p.id)}" aria-label="${isLiked?'Rimuovi mi piace':'Mi piace'}" aria-pressed="${isLiked}">${ico('heart',isLiked,28)}</button>
+           <button class="icon-button" data-action="dislike" data-post="${escape(p.id)}" aria-label="${s.disliked.has(p.id)?'Rimuovi dislike':'Dislike'}" aria-pressed="${s.disliked.has(p.id)}"><span aria-hidden="true">👎</span></button>
            <button class="icon-button" data-action="open_comments" data-post="${escape(p.id)}" aria-label="Commenta">${ico('comment',false,27)}</button>
            <button class="icon-button" data-action="share" data-post="${escape(p.id)}" aria-label="Condividi">${ico('message',false,27)}</button>
          </div>
@@ -151,7 +158,12 @@ export default function (component) {
     const id=btn.dataset.post||null;
     if(action==='nav') { s.tab=btn.dataset.tab; s.overlay=null; signal('navigate',null,{page:s.tab}); window.scrollTo(0,0); }
     else if(action==='like') {
+      if(s.disliked.delete(id))signal('remove_dislike',id);
       if(s.liked.has(id)){s.liked.delete(id);signal('unlike',id);} else{s.liked.add(id);signal('like',id,{method:'button'});}
+    }
+    else if(action==='dislike') {
+      if(s.liked.delete(id))signal('unlike',id);
+      if(s.disliked.has(id)){s.disliked.delete(id);signal('remove_dislike',id);}else{s.disliked.add(id);signal('dislike',id);}
     }
     else if(action==='save') {
       if(s.saved.has(id)){s.saved.delete(id);signal('unsave',id);}else{s.saved.add(id);signal('save',id);}
@@ -196,6 +208,7 @@ export default function (component) {
   root.ondblclick = (e) => {
     const p=e.target.closest('[data-doublepost]');if(!p)return;
     const id=p.dataset.doublepost;
+    if(s.disliked.delete(id))signal('remove_dislike',id);
     if(!s.liked.has(id)){s.liked.add(id);signal('like',id,{method:'double_click'});}
     const heart=p.querySelector('.burst-heart');if(heart){heart.classList.remove('animate');void heart.offsetWidth;heart.classList.add('animate');}
     // Update icon and count after the heart burst animation.

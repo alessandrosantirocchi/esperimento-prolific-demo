@@ -1,0 +1,212 @@
+[
+  {
+    "file": "stimuli/face_01.jpg",
+    "class": "real",
+    "source_repository": "serengil/deepface",
+    "source_commit": "b748cb4e3622d3beaca9a3b60abcc2ee77617a8a",
+    "source_path": "tests/unit/dataset/img1.jpg"
+  },
+  {
+    "file": "stimuli/face_02.jpg",
+    "class": "real",
+    "source_repository": "serengil/deepface",
+    "source_commit": "b748cb4e3622d3beaca9a3b60abcc2ee77617a8a",
+    "source_path": "tests/unit/dataset/img3.jpg"
+  },
+  {
+    "file": "stimuli/face_03.jpg",
+    "class": "real",
+    "source_repository": "serengil/deepface",
+    "source_commit": "b748cb4e3622d3beaca9a3b60abcc2ee77617a8a",
+    "source_path": "tests/unit/dataset/img8.jpg"
+  },
+  {
+    "file": "stimuli/face_04.jpg",
+    "class": "real",
+    "source_repository": "serengil/deepface",
+    "source_commit": "b748cb4e3622d3beaca9a3b60abcc2ee77617a8a",
+    "source_path": "tests/unit/dataset/img13.jpg"
+  },
+  {
+    "file": "stimuli/face_05.jpg",
+    "class": "real",
+    "source_repository": "serengil/deepface",
+    "source_commit": "b748cb4e3622d3beaca9a3b60abcc2ee77617a8a",
+    "source_path": "tests/unit/dataset/img16.jpg"
+  },
+  {
+    "file": "stimuli/face_06.jpg",
+    "class": "real",
+    "source_repository": "serengil/deepface",
+    "source_commit": "b748cb4e3622d3beaca9a3b60abcc2ee77617a8a",
+    "source_path": "tests/unit/dataset/img18.jpg"
+  },
+  {
+    "file": "stimuli/face_07.jpg",
+    "class": "real",
+    "source_repository": "serengil/deepface",
+    "source_commit": "b748cb4e3622d3beaca9a3b60abcc2ee77617a8a",
+    "source_path": "tests/unit/dataset/img20.jpg"
+  },
+  {
+    "file": "stimuli/face_08.jpg",
+    "class": "real",
+    "source_repository": "serengil/deepface",
+    "source_commit": "b748cb4e3622d3beaca9a3b60abcc2ee77617a8a",
+    "source_path": "tests/unit/dataset/img22.jpg"
+  },
+  {
+    "file": "stimuli/face_09.jpg",
+    "class": "real",
+    "source_repository": "serengil/deepface",
+    "source_commit": "b748cb4e3622d3beaca9a3b60abcc2ee77617a8a",
+    "source_path": "tests/unit/dataset/img24.jpg"
+  },
+  {
+    "file": "stimuli/face_10.jpg",
+    "class": "real",
+    "source_repository": "ageitgey/face_recognition",
+    "source_commit": "9f3061aaeed9a8756d2c970f5dfe066617a8281d",
+    "source_path": "examples/obama.jpg"
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 12,
+      "y": 34,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    }
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 470,
+      "y": 34,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    }
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 928,
+      "y": 34,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    }
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 1386,
+      "y": 34,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    }
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 1844,
+      "y": 34,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    }
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 2302,
+      "y": 34,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    }
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 2760,
+      "y": 34,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    }
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 3218,
+      "y": 34,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    }
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 12,
+      "y": 519,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    }
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 470,
+      "y": 519,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    }
+  }
+]
