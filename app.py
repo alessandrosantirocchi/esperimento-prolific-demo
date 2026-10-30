@@ -35,6 +35,8 @@ st.markdown(
       [data-testid="stMainBlockContainer"] { padding: 0 !important; }
       div[data-testid="stVerticalBlock"] { gap: 0 !important; }
       div[data-testid="stElementContainer"] { margin: 0 !important; }
+      /* Impression events trigger reruns; keep the stimulus at full opacity. */
+      .st-key-instalab_main_feed { opacity: 1 !important; transition: none !important; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -103,7 +105,26 @@ if not st.session_state.get("intro_consent_accepted", False):
             letter-spacing: -0.04em; padding-top: 12px;
           }
           .st-key-study_intro h2 {font-size: 1.15rem; padding-top: 24px;}
-          .st-key-study_intro p {line-height: 1.7;}
+          .st-key-study_intro {color-scheme: light;}
+          .st-key-study_intro h1, .st-key-study_intro h2,
+          .st-key-study_intro [data-testid="stMarkdownContainer"],
+          .st-key-study_intro label, .st-key-study_intro summary {color:#202027;}
+          .st-key-study_intro p {line-height: 1.75;}
+          .st-key-study_intro [data-testid="stCaptionContainer"],
+          .st-key-study_intro [data-testid="stCaptionContainer"] p {color:#60606d;}
+          .st-key-study_intro [data-testid="stExpander"] details {
+            background:#f7f8fa; border:1px solid #e4e6ec; border-radius:14px;
+            margin:16px 0 8px;
+          }
+          .st-key-study_intro [data-testid="stExpander"] summary {font-weight:600;}
+          .st-key-study_intro [data-testid="stExpander"] li {margin-bottom:8px;}
+          .st-key-study_intro .intro-actions {
+            display:flex; flex-wrap:wrap; gap:8px; margin:16px 0 20px;
+          }
+          .st-key-study_intro .intro-actions span {
+            background:#f3f5f8; color:#414552; border:1px solid #e6e9ef;
+            border-radius:24px; padding:7px 15px; font-size:.9rem;
+          }
           .st-key-study_intro .intro-brand {
             color: #737373; font-size: .8rem; font-weight: 700;
             letter-spacing: .16em; text-transform: uppercase;
@@ -111,6 +132,14 @@ if not st.session_state.get("intro_consent_accepted", False):
           .st-key-study_intro .intro-brand span {color: #f24d81;}
           .st-key-study_intro .intro-subtitle {color: #737373; font-size: 1.1rem;}
           .st-key-study_intro button {min-height: 48px; border-radius: 12px;}
+          .st-key-study_intro button[kind="primary"]:not(:disabled) {
+            background:#007bc4; border-color:#007bc4; color:#fff;
+          }
+          .st-key-study_intro button[kind="primary"]:not(:disabled) p {color:#fff;}
+          .st-key-study_intro button[kind="primary"]:disabled {
+            background:#f0f2f5; border-color:#e4e6ec;
+          }
+          .st-key-study_intro button[kind="primary"]:disabled p {color:#666b77;}
           .st-key-study_intro [data-testid="stCheckbox"] {margin: 20px 0 12px;}
           @media (max-width: 640px) {
             .st-key-study_intro {
@@ -130,27 +159,38 @@ if not st.session_state.get("intro_consent_accepted", False):
             unsafe_allow_html=True,
         )
         st.write(
-            "Immagina di aprire Instagram e scorrere un feed di post con fotografie "
-            "di volti di persone. Interagisci con i post come preferisci: puoi "
-            "mettere like, commentare e mettere dislike."
+            "Immagina di aprire Instagram: davanti a te trovi un feed di post "
+            "con fotografie di volti di persone. Scorri le immagini e interagisci "
+            "come faresti normalmente sui social. Puoi mettere like ai post che "
+            "ti piacciono, lasciare un commento oppure esprimere un dislike."
+        )
+        st.markdown(
+            '<div class="intro-actions"><span>♡ Metti like</span>'
+            '<span>Lascia un commento</span><span>Esprimi un dislike</span></div>',
+            unsafe_allow_html=True,
         )
         st.subheader("La tua partecipazione")
         st.write(
-            "La partecipazione è volontaria. Puoi scegliere di non iniziare o "
-            "interrompere in qualsiasi momento chiudendo questa pagina. Leggi "
-            "le informazioni sullo studio prima di decidere se proseguire."
+            "Sei tu a scegliere se partecipare. Puoi decidere di non iniziare "
+            "o fermarti in qualsiasi momento, semplicemente chiudendo la pagina. "
+            "Prima di continuare, leggi le informazioni sullo studio e indica "
+            "il tuo consenso."
         )
-        st.warning(
-            "Informazioni da completare prima del reclutamento:\n\n"
-            "- [DA COMPLETARE: gruppo di ricerca, istituzione e contatti]\n"
-            "- [DA COMPLETARE: requisiti di partecipazione e durata prevista]\n"
-            "- [DA COMPLETARE: possibili rischi, disagi e benefici]\n"
-            "- [DA COMPLETARE: compenso e conseguenze dell'interruzione]\n"
-            "- [DA COMPLETARE: dati raccolti, identificativi Prolific, privacy, "
-            "conservazione e accesso ai dati]\n"
-            "- [DA COMPLETARE: ritiro dei dati e relativi limiti]\n"
-            "- [DA COMPLETARE: eventuale revisione etica e contatti per diritti e reclami]"
+        st.caption(
+            "Versione dimostrativa · Le informazioni sullo studio devono essere "
+            "completate prima della raccolta dati."
         )
+        with st.expander("Informazioni sullo studio — da completare"):
+            st.markdown(
+                "- [DA COMPLETARE: gruppo di ricerca, istituzione e contatti]\n"
+                "- [DA COMPLETARE: requisiti di partecipazione e durata prevista]\n"
+                "- [DA COMPLETARE: possibili rischi, disagi e benefici]\n"
+                "- [DA COMPLETARE: compenso e conseguenze dell'interruzione]\n"
+                "- [DA COMPLETARE: dati raccolti, identificativi Prolific, privacy, "
+                "conservazione e accesso ai dati]\n"
+                "- [DA COMPLETARE: ritiro dei dati e relativi limiti]\n"
+                "- [DA COMPLETARE: eventuale revisione etica e contatti per diritti e reclami]"
+            )
         accepted = st.checkbox(
             "Ho letto le informazioni sopra riportate e acconsento volontariamente "
             "a partecipare a questa dimostrazione preliminare.",
