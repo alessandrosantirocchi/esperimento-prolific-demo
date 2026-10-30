@@ -66,7 +66,6 @@ def load_stimuli() -> dict:
     return raw
 
 
-@st.cache_data(show_spinner=False)
 def load_frontend() -> tuple[str, str]:
     return (
         (BASE / "styles.css").read_text(encoding="utf-8"),
