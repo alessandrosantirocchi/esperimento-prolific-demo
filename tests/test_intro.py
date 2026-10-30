@@ -36,10 +36,13 @@ class IntroductionTests(unittest.TestCase):
         timestamp = app.session_state["intro_consent_accepted_at"]
         self.assertIsNotNone(datetime.fromisoformat(timestamp).tzinfo)
         self.assertIn("feed_events", app.session_state)
+        order = list(app.session_state["feed_post_order"])
+        self.assertCountEqual(order, ["P001", "P002", "P003", "P004"])
         app.run()
         self.assertFalse(app.exception)
         self.assertEqual(len(app.checkbox), 0)
         self.assertEqual(app.session_state["intro_consent_accepted_at"], timestamp)
+        self.assertEqual(app.session_state["feed_post_order"], order)
 
 
 if __name__ == "__main__":

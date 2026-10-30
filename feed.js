@@ -76,26 +76,6 @@ export default function (component) {
   const navItem = (tab, iconName, label, hideOnCompact=false) =>
     `<button class="nav-entry ${s.tab===tab?'selected':''} ${hideOnCompact?'compact-hide':''}" data-action="nav" data-tab="${tab}" aria-label="${escape(label)}">${ico(iconName, s.tab===tab)}<span>${escape(label)}</span></button>`;
 
-  const sidebar = () => `
-    <aside class="desktop-sidebar">
-      <button class="wordmark" data-action="nav" data-tab="home" aria-label="Home">InstaLab<span class="brand-dot">.</span></button>
-      <div class="sidebar-nav">
-        ${navItem('home','home','Home')}${navItem('search','search','Cerca')}
-        ${navItem('explore','compass','Esplora')}${navItem('reels','reels','Reels')}
-        ${navItem('messages','message','Messaggi')}${navItem('notifications','heart','Notifiche')}
-        ${navItem('create','plus','Crea')}${navItem('profile','profile','Profilo')}
-      </div>
-      <div class="sidebar-footer">
-        <button class="nav-entry" data-action="more">${ico('menu')}<span>Altro</span></button>
-      </div>
-    </aside>`;
-  const mobileNav = () => `<div class="mobile-bottom">
-     ${['home','explore','create','reels','profile'].map(n => `<button data-action="nav" data-tab="${n}" aria-label="${n}">${ico(n === 'explore'?'compass':n,n===s.tab,26)}</button>`).join('')}
-   </div>`;
-  const mobileHeader = () => `<header class="mobile-top">
-    <span class="wordmark mobile-brand">InstaLab<span class="brand-dot">.</span></span>
-    <div><button data-action="nav" data-tab="search" aria-label="Cerca">${ico('search')}</button><button data-action="nav" data-tab="notifications" aria-label="Notifiche">${ico('heart')}</button></div>
-  </header>`;
   const storyList = () => `<div class="stories" aria-label="Storie">
     ${stories.map((a,i)=>`<button class="story" data-action="story" data-index="${i}" title="Apri storia di ${escape(a.username)}">
       <span class="story-ring ${a.own?'own':''}"><span class="story-inside">${profileAvatar(a.image_url)}</span>${a.own?'<b class="story-plus">+</b>':''}</span>
@@ -134,15 +114,7 @@ export default function (component) {
        </div>
      </article>`;
   };
-  const suggestions = () => `<aside class="suggestions">
-      <div class="current-user"><span class="you-avatar">${ico('profile',false,27)}</span><div><strong>you.research</strong><small>Profilo sperimentale</small></div><span class="switch-label">Demo</span></div>
-      <div class="suggest-title"><strong>Suggeriti per te</strong><small>Mostra tutti</small></div>
-      ${posts.slice(0,4).map(p=>`<div class="suggest-person">${profileAvatar(p.avatar_url)}<div><strong>${escape(p.username)}</strong><small>Consigliato per te</small></div><button class="follow-link ${s.followed.has(p.username)?'following':''}" data-action="follow" data-user="${escape(p.username)}">${s.followed.has(p.username)?'Segui già':'Segui'}</button></div>`).join('')}
-      <p class="suggest-footer">Informazioni · Assistenza · Privacy · Condizioni · Lingua</p>
-      <p class="suggest-footer">© InstaLab · SIMULAZIONE DI RICERCA</p>
-      <div class="research-note">${ico('info',false,16)} <span>Questa interfaccia è una simulazione. Non è collegata a Instagram.</span></div>
-    </aside>`;
-  const home = () => `<div class="feed-area"><main class="timeline">${storyList()}<div class="post-list">${posts.map(post).join('')}</div><div class="end-feed"><div class="end-check">${ico('check')}</div><strong>Sei in pari</strong><span>Hai visto tutti i post di questa simulazione</span></div></main>${suggestions()}</div>`;
+  const home = () => `<div class="feed-area"><main class="timeline">${storyList()}<div class="post-list">${posts.map(post).join('')}</div><div class="end-feed"><div class="end-check">${ico('check')}</div><strong>Sei in pari</strong><span>Hai visto tutti i post di questa simulazione</span></div></main></div>`;
   const explore = (savedOnly=false) => `<section class="other-page"><header class="other-header"><h2>${savedOnly?'Elementi salvati':'Esplora'}</h2><p>${savedOnly?'I post che hai salvato':'Scopri i post della simulazione'}</p></header><div class="explore-grid">${posts.filter(p=>!savedOnly||s.saved.has(p.id)).map(p=>`<button class="explore-tile" data-action="open_post" data-post="${escape(p.id)}"><img src="${escape(p.image_url)}" alt=""/><span>${ico('heart',true,18)} ${shorten(Number(p.initial_likes)||0)}</span></button>`).join('')||'<div class="empty-state">Non hai ancora salvato nessun post.</div>'}</div></section>`;
   const search = () => `<section class="other-page"><header class="other-header"><h2>Cerca</h2><p>Cerca profili e post dimostrativi</p></header><div class="search-box">${ico('search')}<input autofocus class="search-input" type="search" placeholder="Cerca" value="${escape(s.query)}" aria-label="Cerca nel feed" /></div><div class="search-results">${posts.filter(p=>p.username.toLowerCase().includes(s.query.toLowerCase())||p.caption.toLowerCase().includes(s.query.toLowerCase())).map(p=>`<button class="search-result" data-action="open_post" data-post="${escape(p.id)}">${profileAvatar(p.avatar_url)}<span><strong>${escape(p.username)}</strong><small>${escape(p.location)}</small></span>${ico('chevron',false,18)}</button>`).join('')}</div></section>`;
   const profile = () => `<section class="other-page profile-page"><div class="profile-header"><span class="large-avatar">${ico('profile',false,48)}</span><div><div class="profile-username">you.research <span class="demo-tag">Account demo</span></div><div class="profile-stats"><span><strong>0</strong> post</span><span><strong>0</strong> follower</span><span><strong>${s.followed.size}</strong> seguiti</span></div><p>Profilo di simulazione per studi di ricerca.</p></div></div><div class="profile-tabs"><button class="active">${ico('grid',false,17)} Post</button><button data-action="nav" data-tab="saved">${ico('bookmark',false,17)} Elementi salvati</button></div><div class="empty-state">I post del feed sono esempi, non appartengono a questo profilo.</div></section>`;
@@ -170,7 +142,7 @@ export default function (component) {
   const render = () => {
     const y=window.scrollY;
     const body = s.tab==='home'?home():s.tab==='explore'?explore():s.tab==='saved'?explore(true):s.tab==='search'?search():s.tab==='profile'?profile():misc(s.tab);
-    root.innerHTML = `<div class="instalab-shell">${sidebar()}${mobileHeader()}<div class="page-content">${body}</div>${mobileNav()}${modal()}</div>`;
+    root.innerHTML = `<div class="instalab-shell"><div class="page-content">${body}</div>${modal()}</div>`;
     window.requestAnimationFrame(()=>window.scrollTo({top:y,behavior:'instant'}));
   };
 
