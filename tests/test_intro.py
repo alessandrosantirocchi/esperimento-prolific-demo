@@ -1,6 +1,7 @@
 """Run with: python -m unittest discover -s tests."""
 
 import unittest
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -37,12 +38,23 @@ class IntroductionTests(unittest.TestCase):
         self.assertIsNotNone(datetime.fromisoformat(timestamp).tzinfo)
         self.assertIn("feed_events", app.session_state)
         order = list(app.session_state["feed_post_order"])
-        self.assertCountEqual(order, ["P001", "P002", "P003", "P004"])
+        self.assertCountEqual(order, [f"P{i:03}" for i in range(1, 21)])
         app.run()
         self.assertFalse(app.exception)
         self.assertEqual(len(app.checkbox), 0)
         self.assertEqual(app.session_state["intro_consent_accepted_at"], timestamp)
         self.assertEqual(app.session_state["feed_post_order"], order)
+
+    def test_provisional_stimuli_are_balanced_and_available(self):
+        posts = json.loads((APP.parent / "posts.json").read_text())["posts"]
+        self.assertEqual(len(posts), 20)
+        self.assertEqual(sum(p["stimulus_type"] == "real" for p in posts), 10)
+        self.assertEqual(sum(p["stimulus_type"] == "deepfake" for p in posts), 10)
+        self.assertEqual(len({p["stimulus_id"] for p in posts}), 20)
+        for post in posts:
+            self.assertTrue((APP.parent / post["image"]).is_file())
+        regions = [tuple(p["image_region"].values()) for p in posts if "image_region" in p]
+        self.assertEqual(len(set(regions)), 10)
 
 
 if __name__ == "__main__":
