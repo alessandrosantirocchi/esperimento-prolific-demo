@@ -10,6 +10,7 @@ import base64
 import csv
 import io
 import json
+import random
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -186,6 +187,16 @@ if not st.session_state.get("intro_consent_accepted", False):
 study = load_stimuli()
 css, js = load_frontend()
 
+posts_by_id = {post["id"]: post for post in study.get("posts", [])}
+if (
+    "feed_post_order" not in st.session_state
+    or set(st.session_state.feed_post_order) != set(posts_by_id)
+):
+    st.session_state.feed_post_order = random.SystemRandom().sample(
+        list(posts_by_id), k=len(posts_by_id)
+    )
+ordered_posts = [posts_by_id[post_id] for post_id in st.session_state.feed_post_order]
+
 if "feed_events" not in st.session_state:
     st.session_state.feed_events = []
     st.session_state.seen_event_ids = set()
@@ -201,7 +212,7 @@ feed_component = st.components.v2.component(
 response = feed_component(
     key="instalab_main_feed",
     data={
-        "posts": study.get("posts", []),
+        "posts": ordered_posts,
         "stories": study.get("stories", []),
         "title": study.get("display_name", "InstaLab"),
         "participant_id": participant_id,
