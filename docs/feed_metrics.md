@@ -72,6 +72,8 @@ Ogni azione social ha un `action_id`. Se un clic su Dislike rimuove il Like, si 
 
 Ogni riga include `participant_id`, `session_id`, `stimulus_id`, `post_id`, `filename`, `gender` e `feed_position` (1–30 nell'ordine effettivo della sessione).
 
+Le nuove sessioni includono anche `participant_gender`, `participant_age` e `participant_education`, dichiarati nel modulo dopo il consenso e riportati nei dati di avvio. `gender` continua a descrivere il volto del manifest. I tre nuovi campi rimangono vuoti per sessioni storiche prive di questionario; `prefer_not_to_say` indica una non risposta esplicita, distinta da un dato mancante. Le definizioni e la codifica dei titoli di studio sono nel [README](../README.md#dati-del-partecipante-dopo-il-consenso).
+
 Con il link pubblico, `participant_id` è un codice `P_…` generato dall'app per la nuova partecipazione, senza dipendere da un servizio di reclutamento. Resta stabile durante le due fasi e i rerun; una nuova sessione riceve un nuovo codice. I dati storici e gli ID di eventuali sessioni già in corso non vengono riscritti. Non è un sistema per riconoscere la stessa persona in partecipazioni diverse.
 
 Nel nuovo dataset `stimulus_type` contiene **Real/GAN/Transformer** e `source_type` conserva i valori canonici **real/gan/transformer** del manifest. Nel registro eventi preesistente la colonna `stimulus_type` mantiene il raggruppamento storico real/deepfake per compatibilità; usare `source_type` per distinguere le tre categorie in entrambi i dataset. Nessuna categoria viene dedotta da didascalie o nomi del profilo.

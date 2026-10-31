@@ -3,16 +3,17 @@
 import csv
 import io
 import json
+from participant_data import DEMOGRAPHIC_FIELDS
 
 EVENT_COLUMNS = (
-    "session_id", "event_id", "participant_id", "event_type", "post_id",
+    "session_id", "event_id", "participant_id", *DEMOGRAPHIC_FIELDS, "event_type", "post_id",
     "stimulus_id", "filename", "source_type", "gender", "stimulus_type", "feed_position", "client_ts", "server_received_ts", "phase",
     "trial_id", "response", "target", "correct", "response_time_ms",
     "displayed_client_ts", "elapsed_ms", "details",
 )
 REACTION_TYPES = {"like", "unlike", "dislike", "remove_dislike"}
 REACTION_COLUMNS = (
-    "session_id", "participant_id", "post_id", "stimulus_id", "filename", "source_type", "gender", "stimulus_type",
+    "session_id", "participant_id", *DEMOGRAPHIC_FIELDS, "post_id", "stimulus_id", "filename", "source_type", "gender", "stimulus_type",
     "reaction", "last_server_received_ts",
 )
 

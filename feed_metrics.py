@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 import math
+from participant_data import DEMOGRAPHIC_FIELDS, demographic_values
 
 TRACKING_VERSION = 1
 DURATION_FIELDS = ("total_view_duration_ms", "first_view_duration_ms", "view_count",
@@ -9,7 +10,7 @@ DURATION_FIELDS = ("total_view_duration_ms", "first_view_duration_ms", "view_cou
 SOCIAL_TYPES = {"like", "unlike", "dislike", "remove_dislike", "save", "unsave",
                 "open_comments", "expand_comments", "comment_submit", "share_confirmed"}
 FEED_METRIC_COLUMNS = (
-    "participant_id", "session_id", "stimulus_id", "post_id", "filename",
+    "participant_id", "session_id", *DEMOGRAPHIC_FIELDS, "stimulus_id", "post_id", "filename",
     "stimulus_type", "source_type", "gender", "feed_position",
     *DURATION_FIELDS, "liked", "like_count", "unlike_count", "disliked", "dislike_count",
     "remove_dislike_count", "saved", "comment_open_count", "comment_count",
@@ -66,7 +67,7 @@ def feed_metrics_rows(events, finalized_only=True):
         for position, post_id in enumerate(order, 1):
             post = metadata.get(post_id) or next(iter(post_events[post_id]), {})
             category = post.get("source_type", "")
-            row = {"participant_id": start.get("participant_id", ""), "session_id": session,
+            row = {"participant_id": start.get("participant_id", ""), "session_id": session, **demographic_values(start),
                    "post_id": post_id, "stimulus_id": post.get("stimulus_id", ""),
                    "filename": post.get("filename", ""), "source_type": category,
                    "stimulus_type": {"real": "Real", "gan": "GAN", "transformer": "Transformer"}.get(category, ""),

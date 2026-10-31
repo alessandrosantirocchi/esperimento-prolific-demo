@@ -22,7 +22,7 @@ class IntroductionTests(unittest.TestCase):
         self.addCleanup(folder.cleanup)
         self.catalog = load_catalog(create_catalog(folder.name))
         catalog = patch("stimulus_catalog.load_catalog", return_value=self.catalog)
-        catalog.start()
+        self.catalog_loader = catalog.start()
         self.addCleanup(catalog.stop)
         storage = patch("event_store.save_events")
         self.storage = storage.start()
@@ -30,6 +30,12 @@ class IntroductionTests(unittest.TestCase):
         deleted = patch("event_store.is_session_deleted", return_value=False)
         deleted.start()
         self.addCleanup(deleted.stop)
+
+    def complete_details(self, app, gender="woman", age=24, education="bachelor"):
+        next(s for s in app.selectbox if s.key == "demographic_gender").set_value(gender)
+        app.number_input[0].set_value(age)
+        next(s for s in app.selectbox if s.key == "demographic_education").set_value(education)
+        next(b for b in app.button if b.label == "Continua al feed").click().run()
 
     def test_consent_is_required_and_can_be_unchecked(self):
         app = AppTest.from_file(str(APP)).run()
@@ -53,6 +59,7 @@ class IntroductionTests(unittest.TestCase):
         self.assertEqual(uuid.UUID(hex=participant[2:]).version, 4)
         app.checkbox[0].check().run()
         app.button[0].click().run()
+        self.complete_details(app)
         self.assertFalse(app.exception)
         self.assertTrue(app.session_state["intro_consent_accepted"])
         self.assertEqual(app.session_state["intro_consent_participant_id"], participant)
@@ -95,8 +102,11 @@ class IntroductionTests(unittest.TestCase):
         app = AppTest.from_file(str(APP)).run()
         app.checkbox[0].check().run()
         app.button[0].click().run()
+        self.complete_details(app)
         session = app.session_state["recording_session_id"]
         del app.session_state["participant_id"]
+        del app.session_state["participant_demographics"]
+        del app.session_state["demographics_completed"]
         app.session_state["intro_consent_participant_id"] = "LEGACY_PARTICIPANT"
         app.session_state["feed_events"] = [{**e, "participant_id":"LEGACY_PARTICIPANT"} for e in app.session_state["feed_events"]]
         calls = self.storage.call_count
@@ -105,6 +115,30 @@ class IntroductionTests(unittest.TestCase):
         self.assertEqual(app.session_state["participant_id"], "LEGACY_PARTICIPANT")
         self.assertEqual(app.session_state["recording_session_id"], session)
         self.assertEqual(self.storage.call_count, calls)
+
+    def test_demographics_are_required_between_consent_and_feed(self):
+        app = AppTest.from_file(str(APP)).run()
+        app.checkbox[0].check().run()
+        app.button[0].click().run()
+        self.assertEqual(app.title[0].value, "Prima di iniziare")
+        self.assertTrue(all(s.value is None for s in app.selectbox))
+        self.assertIsNone(app.number_input[0].value)
+        self.catalog_loader.assert_not_called()
+        self.storage.assert_not_called()
+        app.button[0].click().run()
+        self.assertEqual(len(app.error), 1)
+        self.assertNotIn("stimulus_selection", app.session_state)
+        self.complete_details(app, gender="prefer_not_to_say", age=0, education="other")
+        self.assertFalse(app.exception)
+        self.assertTrue(app.session_state["demographics_completed"])
+        self.assertEqual(app.session_state["participant_demographics"],
+                         {"participant_gender":"prefer_not_to_say", "participant_age":0, "participant_education":"other"})
+        self.assertEqual(len(app.selectbox), 0)
+        profile = [e for e in app.session_state["feed_events"] if e["event_type"] == "demographics_submitted"]
+        self.assertEqual(len(profile), 1)
+        self.assertIn("consent_accepted_at", profile[0]["details"])
+        app.run()
+        self.assertEqual(len([e for e in app.session_state["feed_events"] if e["event_type"] == "demographics_submitted"]), 1)
 
     def test_catalog_reserves_distinct_new_faces(self):
         selection = select_sets(self.catalog)
@@ -116,6 +150,7 @@ class IntroductionTests(unittest.TestCase):
         app = AppTest.from_file(str(APP)).run()
         app.checkbox[0].check().run()
         app.button[0].click().run()
+        self.complete_details(app)
         calls = self.storage.call_count
         app.session_state["stimulus_selection"] = {**app.session_state["stimulus_selection"],
                                                   "protocol_version": "previous-protocol"}
@@ -129,20 +164,41 @@ class IntroductionTests(unittest.TestCase):
         app = AppTest.from_file(str(APP)).run()
         app.checkbox[0].check().run()
         app.button[0].click().run()
+        self.complete_details(app)
         self.assertFalse(app.exception)
         self.assertEqual(len(app.error), 1)
         self.assertEqual(app.session_state["feed_events"], [])
         self.assertEqual(app.session_state["seen_event_ids"], set())
+        self.assertFalse(app.session_state.get("demographics_completed", False))
+        self.storage.side_effect = None
+        app.button[0].click().run()
+        self.assertFalse(app.exception)
+        self.assertEqual(len(app.error), 0)
+        self.assertEqual(app.session_state["feed_events"][0]["event_type"], "demographics_submitted")
+        self.assertEqual(len([e for e in app.session_state["feed_events"] if e["event_type"] == "session_started"]), 1)
+
+    def test_failed_feed_start_does_not_resubmit_saved_demographics(self):
+        def fail_start(session, events):
+            if any(e["event_type"] == "session_started" for e in events):
+                raise sqlite3.OperationalError("database is locked")
+        self.storage.side_effect = fail_start
+        app = AppTest.from_file(str(APP)).run()
+        app.checkbox[0].check().run()
+        app.button[0].click().run()
+        self.complete_details(app)
+        self.assertEqual(len(app.error), 1)
+        self.assertTrue(app.session_state["demographics_completed"])
+        self.assertEqual([e["event_type"] for e in app.session_state["feed_events"]], ["demographics_submitted"])
         self.storage.side_effect = None
         app.run()
         self.assertFalse(app.exception)
-        self.assertEqual(len(app.error), 0)
-        self.assertEqual(app.session_state["feed_events"][0]["event_type"], "session_started")
+        self.assertEqual(len([e for e in app.session_state["feed_events"] if e["event_type"] == "demographics_submitted"]), 1)
 
     def test_memory_instructions_appear_only_after_first_phase(self):
         app = AppTest.from_file(str(APP)).run()
         app.checkbox[0].check().run()
         app.button[0].click().run()
+        self.complete_details(app)
         self.assertFalse(app.exception)
         self.assertFalse(any("Hai già visto" in title.value for title in app.title))
         plan = list(app.session_state["recognition_plan"])
@@ -159,6 +215,7 @@ class IntroductionTests(unittest.TestCase):
         self.assertEqual(app.session_state["participant_id"], participant)
         self.assertEqual(app.session_state["recording_session_id"], session)
         self.assertEqual({e["participant_id"] for e in app.session_state["feed_events"]}, {participant})
+        self.assertTrue(all(e["participant_age"] == 24 and e["participant_gender"] == "woman" for e in app.session_state["feed_events"]))
         self.assertTrue(any(e["event_type"] == "recognition_started" for e in app.session_state["feed_events"]))
 
 

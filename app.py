@@ -20,6 +20,7 @@ from image_assets import prepare_image
 from export_data import csv_bytes as export_csv
 from research_dashboard import render_dashboard
 from experiment_protocol import PROTOCOL_VERSION
+from participant_data import GENDER_OPTIONS, EDUCATION_OPTIONS, validate_demographics
 from feed_metrics import TRACKING_VERSION, FEED_METRIC_COLUMNS, feed_metrics_rows, valid_view_details
 from stimulus_catalog import (load_catalog, select_sets, CatalogError, METADATA_FIELDS,
                               display_post, public_history)
@@ -222,7 +223,7 @@ if not st.session_state.get("intro_consent_accepted", False):
                 "- [DA COMPLETARE: gruppo di ricerca, istituzione e contatti]\n"
                 "- [DA COMPLETARE: requisiti, durata, rischi/disagi e benefici, "
                 "compenso e conseguenze dell'interruzione]\n"
-                "- [DA COMPLETARE: dati raccolti, codici di partecipazione e sessione, privacy, "
+                "- [DA COMPLETARE: dati raccolti (genere, età, istruzione e risposte), codici di partecipazione e sessione, privacy, "
                 "conservazione, accesso e ritiro dei dati con relativi limiti]\n"
                 "- [DA COMPLETARE: eventuale revisione etica e contatti per diritti e reclami]"
             )
@@ -242,6 +243,94 @@ if not st.session_state.get("intro_consent_accepted", False):
             st.session_state.intro_consent_participant_id = participant_id
             st.rerun()
     st.stop()
+
+if "recording_session_id" not in st.session_state:
+    st.session_state.recording_session_id = str(uuid.uuid4())
+if "feed_events" not in st.session_state:
+    st.session_state.feed_events = []
+    st.session_state.seen_event_ids = set()
+
+try:
+    deleted = is_session_deleted(st.session_state.recording_session_id)
+except (sqlite3.Error, OSError):
+    st.error("Il database non è disponibile. Riprova senza chiudere la pagina.")
+    st.stop()
+if st.session_state.get("recording_deleted", False) or deleted:
+    st.session_state.feed_events = []
+    st.session_state.seen_event_ids = set()
+    st.session_state.recording_deleted = True
+    st.info("Questa sessione è stata eliminata dal ricercatore. Per iniziare una nuova prova, ricarica la pagina.")
+    st.stop()
+
+# Existing runs keep their place; newly consented sessions complete this step
+# before selecting or loading faces. Mark completion only after a durable save.
+if not st.session_state.get("demographics_completed", False) and not st.session_state.get("recording_initialized", False):
+    st.markdown("""
+        <style>
+          .st-key-participant_details {width:min(100% - 24px,600px);margin:32px auto;padding:32px;
+            border:1px solid #e9e9f0;border-radius:24px;background:#fff;color:#202027;
+            box-shadow:0 18px 64px #28203909;color-scheme:light;}
+          .st-key-participant_details h1 {font-size:clamp(1.8rem,5vw,2.4rem);letter-spacing:-.04em;padding-top:0;}
+          .st-key-participant_details h1,.st-key-participant_details p,.st-key-participant_details label {color:#202027;}
+          .st-key-participant_details [data-baseweb="select"]>div,
+          .st-key-participant_details [data-baseweb="input"],
+          .st-key-participant_details [data-testid="stSelectbox"] [role="group"],
+          .st-key-participant_details [data-testid="stNumberInputContainer"] {background:#f8f9fc;color:#202027;border-color:#dddfea;}
+          .st-key-participant_details input {color:#202027;background:transparent;}
+          .st-key-participant_details input::placeholder {color:#747481;opacity:1;}
+          .st-key-participant_details [data-testid="stSelectbox"] button {background:transparent;color:#60606d;}
+          .st-key-participant_details [data-testid="stNumberInputContainer"] button {background:transparent;}
+          .st-key-participant_details [data-testid="stNumberInputContainer"] svg {color:#8b8d99;}
+          .st-key-participant_details [data-testid="stSelectbox"] [role="group"]:focus-within,
+          .st-key-participant_details [data-testid="stNumberInputContainer"]:focus-within {border-color:#007bc4;box-shadow:0 0 0 1px #007bc4;}
+          .st-key-participant_details [data-testid="stForm"] {padding:0;}
+          .st-key-participant_details [data-testid="stVerticalBlock"] {gap:12px !important;}
+          .st-key-participant_details button[kind^="primary"] {background:#007bc4;border-color:#007bc4;border-radius:12px;min-height:48px;}
+          .st-key-participant_details button[kind^="primary"] p {color:#fff;}
+          .st-key-participant_details [data-testid="stCaptionContainer"] p {color:#60606d;}
+          @media(max-width:640px){.st-key-participant_details {margin:12px auto;padding:24px 18px;border-radius:18px;}}
+        </style>
+    """, unsafe_allow_html=True)
+    with st.container(key="participant_details"):
+        st.title("Prima di iniziare")
+        st.write("Indica queste informazioni: saranno associate al tuo codice partecipante.")
+        with st.form("participant_details_form", border=False):
+            gender = st.selectbox("Genere", list(GENDER_OPTIONS), index=None, format_func=GENDER_OPTIONS.get,
+                                  placeholder="Seleziona una risposta", key="demographic_gender")
+            age = st.number_input("Età (anni compiuti)", min_value=0, value=None, step=1,
+                                  placeholder="Inserisci la tua età", key="demographic_age")
+            education = st.selectbox("Titolo di studio più alto conseguito", list(EDUCATION_OPTIONS), index=None,
+                                     format_func=EDUCATION_OPTIONS.get, placeholder="Seleziona una risposta",
+                                     help="Indica un titolo già completato, anche se stai ancora studiando.",
+                                     key="demographic_education")
+            submitted = st.form_submit_button("Continua al feed", type="primary", width="stretch")
+        if submitted:
+            try:
+                values = validate_demographics(gender, age, education)
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                event = {"event_id": "demographics_submitted", "event_type": "demographics_submitted",
+                         "phase": "demographics", "participant_id": participant_id,
+                         "session_id": st.session_state.recording_session_id, **values,
+                         "server_received_ts": datetime.now(timezone.utc).isoformat(),
+                         "details": {**values, "consent_accepted_at": st.session_state.intro_consent_accepted_at}}
+                try:
+                    save_events(st.session_state.recording_session_id, [event])
+                except SessionDeletedError:
+                    st.session_state.recording_deleted = True
+                    st.rerun()
+                except (sqlite3.Error, OSError):
+                    st.error("Non è stato possibile salvare le risposte. Riprova con Continua al feed senza chiudere la pagina.")
+                else:
+                    st.session_state.participant_demographics = values
+                    st.session_state.demographics_completed = True
+                    st.session_state.feed_events.append(event)
+                    st.session_state.seen_event_ids.add(event["event_id"])
+                    st.rerun()
+    st.stop()
+
+participant_details = st.session_state.get("participant_demographics", {})
 
 try:
     catalog = load_catalog(BASE)
@@ -275,24 +364,6 @@ if "recognition_plan" not in st.session_state:
 if "experiment_phase" not in st.session_state:
     st.session_state.experiment_phase = "feed"
 
-if "feed_events" not in st.session_state:
-    st.session_state.feed_events = []
-    st.session_state.seen_event_ids = set()
-if "recording_session_id" not in st.session_state:
-    st.session_state.recording_session_id = str(uuid.uuid4())
-
-try:
-    deleted = is_session_deleted(st.session_state.recording_session_id)
-except (sqlite3.Error, OSError):
-    st.error("Il database non è disponibile. Riprova senza chiudere la pagina.")
-    st.stop()
-if st.session_state.get("recording_deleted", False) or deleted:
-    st.session_state.feed_events = []
-    st.session_state.seen_event_ids = set()
-    st.session_state.recording_deleted = True
-    st.info("Questa sessione è stata eliminata dal ricercatore. Per iniziare una nuova prova, ricarica la pagina.")
-    st.stop()
-
 phase = st.session_state.experiment_phase
 if phase == "recognition_intro":
     with st.container(key="recognition_info"):
@@ -303,6 +374,7 @@ if phase == "recognition_intro":
         if st.button("Inizia il riconoscimento", type="primary"):
             event = {"event_id": "recognition_started", "event_type": "recognition_started",
                      "participant_id": participant_id, "session_id": st.session_state.recording_session_id,
+                     **participant_details,
                      "phase": "recognition", "server_received_ts": datetime.now(timezone.utc).isoformat()}
             try:
                 save_events(st.session_state.recording_session_id, [event])
@@ -490,6 +562,8 @@ try:
                                     for p in study["posts"] + study["recognition_new_posts"]]},
         })
     if pending_events:
+        for event in pending_events:
+            event.update(participant_details)
         save_events(st.session_state.recording_session_id, pending_events)
         st.session_state.feed_events.extend(pending_events)
         st.session_state.seen_event_ids.update(e["event_id"] for e in pending_events)

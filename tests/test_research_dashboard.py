@@ -110,6 +110,9 @@ class ResearchDashboardTests(unittest.TestCase):
 
     def test_feed_metrics_download_keeps_assignment_when_filtering_memory(self):
         self.reader.return_value = [
+            {"session_id":"s1", "event_id":"demographics_submitted", "participant_id":"SUBJECT_A",
+             "event_type":"demographics_submitted", "phase":"demographics",
+             "participant_gender":"woman", "participant_age":24, "participant_education":"bachelor"},
             {"session_id":"s1", "event_id":"start", "participant_id":"SUBJECT_A", "event_type":"session_started",
              "details":{"post_order":["P001"], "stimuli":[{"id":"P001","stimulus_id":"TEMP001","source_type":"gan","gender":"F"}]}},
             {"session_id":"s1", "event_id":"tracking", "participant_id":"SUBJECT_A", "event_type":"feed_tracking_started", "details":{"tracking_version":1}},
@@ -122,6 +125,8 @@ class ResearchDashboardTests(unittest.TestCase):
         self.assertFalse(app.exception)
         download = next(e.proto for e in app.get("download_button") if e.proto.label == "Metriche del feed (CSV)")
         self.assertFalse(download.disabled)
+        profile_download = next(e.proto for e in app.get("download_button") if e.proto.label == "Dati partecipanti (CSV)")
+        self.assertFalse(profile_download.disabled)
 
     def test_repeated_failed_logins_are_throttled_without_reading_records(self):
         with patch("research_dashboard.time.monotonic", return_value=100):

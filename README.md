@@ -16,7 +16,7 @@ python -m streamlit run app.py
 
 Su Windows usare `python` al posto di `python3` e attivare l'ambiente con `.venv\Scripts\Activate.ps1` in PowerShell.
 
-Aprire l'indirizzo mostrato da Streamlit, senza aggiungere identificativi al link. Accettare il consenso, scorrere tutti i volti, premere **Continua**, leggere le istruzioni e avviare il riconoscimento. Per una nuova sessione ricaricare la pagina. Non è implementata la ripresa di una sessione interrotta.
+Aprire l'indirizzo mostrato da Streamlit, senza aggiungere identificativi al link. Accettare il consenso, compilare i dati del partecipante, scorrere tutti i volti, premere **Continua**, leggere le istruzioni e avviare il riconoscimento. Per una nuova sessione ricaricare la pagina. Non è implementata la ripresa di una sessione interrotta.
 
 ### Raccolta tramite un link pubblico
 
@@ -25,6 +25,24 @@ Per una bacheca universitaria si può condividere il normale indirizzo pubblico 
 Nei CSV usare `participant_id` e `session_id` per distinguere le partecipazioni; aggiungere `stimulus_id` per unire metriche del feed e risposte di memoria. Non vengono richiesti nome, e-mail o matricola per assegnare il codice. Il codice identifica una partecipazione, non certifica una persona distinta: una nuova scheda o un refresh che avvia una nuova sessione assegna nuovi codici e non permette di rilevare da solo partecipazioni ripetute. Non è implementato un identificatore persistente del browser.
 
 I risultati storici non vengono riscritti. Se durante un aggiornamento è ancora attiva una sessione già consenziente, viene conservato il suo identificativo precedente, evitando di dividere la stessa prova tra codici diversi.
+
+### Dati del partecipante dopo il consenso
+
+La sequenza delle nuove sessioni è **consenso → dati del partecipante → feed → riconoscimento**. Prima di mostrare o selezionare i volti viene presentato un modulo con tre campi senza risposte preselezionate:
+
+| Campo esportato | Risposta |
+|---|---|
+| `participant_gender` | `woman` (Donna), `man` (Uomo), `non_binary` (Non binario), `other` (Altro), `prefer_not_to_say` (Preferisco non rispondere) |
+| `participant_age` | Età dichiarata in anni compiuti, numero intero non negativo |
+| `participant_education` | `high_school` (Diploma di scuola superiore), `bachelor` (Laurea triennale), `master` (Laurea magistrale), `doctorate` (Dottorato di ricerca), `other` (Altro / nessuno di questi), `prefer_not_to_say` (Preferisco non rispondere) |
+
+Si richiede il titolo più alto **già conseguito**, anche per chi sta ancora studiando. Il controllo numerico dell'età non introduce un criterio di ammissione per età; eventuali requisiti di partecipazione devono essere definiti nelle informazioni sullo studio. Il modulo richiede i tre campi e consente le scelte esplicite di non risposta per genere e istruzione.
+
+**Continua al feed** valida e salva le risposte nell'evento `demographics_submitted`, associato a `participant_id`, `session_id` e timestamp del consenso. Solo dopo la transazione riuscita il modulo viene segnato come completato e si apre il feed. Un errore permette di riprovare mantenendo le risposte; gli ID fissi per sessione e la deduplicazione SQLite impediscono registrazioni doppie.
+
+Le risposte vengono riportate negli export degli eventi, delle reazioni, della memoria e di `feed_metrics.csv`. Il download **Dati partecipanti (CSV)** nell'Area ricercatore produce `instalab_partecipanti.csv`, una riga per questionario salvato, con i due identificativi e `demographics_submitted_at`. I dati del partecipante e le metriche usano i filtri di partecipante/sessione/completamento, indipendentemente dal filtro Fase; quest'ultimo include anche **Dati partecipante** per il registro eventi.
+
+`participant_gender` riguarda chi risponde, mentre `gender` continua a indicare il genere del **volto** definito nel manifest. I dati dichiarati non modificano estrazione degli stimoli, bilanciamento o assegnazioni OLD/NEW. I valori storici mancanti restano vuoti e una non risposta esplicita rimane `prefer_not_to_say`. Le sessioni già avviate prima dell'introduzione del modulo proseguono senza essere rimandate al questionario.
 
 Le prove locali registrano dati nello stesso modo delle altre sessioni. Per tenere un database di prova separato, impostare `INSTALAB_DB_PATH` prima dell'avvio, per esempio su macOS/Linux:
 
@@ -112,6 +130,7 @@ Dopo l'accesso, **Aggiorna dati** legge le sessioni del server. I filtri consent
 - **Reazioni finali per volto (CSV)**: LIKE, DISLIKE o NONE per ogni volto su cui è stata espressa almeno una reazione.
 - **Registro completo (CSV/JSON)**: tutti gli eventi filtrati; il JSON mantiene i metadati strutturati. I CSV proteggono i testi interpretabili come formule dai fogli di calcolo.
 - **Metriche del feed (CSV)**: `feed_metrics.csv`, una riga per ciascuno dei 30 post assegnati, dopo la finalizzazione del feed, con tempi al 75%, reazioni e azioni social. Comprende gli zeri dei post mai sufficientemente visibili e segnala i tempi mancanti. Vedi [definizioni e limiti delle metriche](docs/feed_metrics.md).
+- **Dati partecipanti (CSV)**: `instalab_partecipanti.csv`, una riga per questionario demografico salvato, collegabile agli altri dati tramite `participant_id` e `session_id`.
 
 L'anteprima della memoria mostra al massimo 500 righe, mentre i download includono tutte le righe filtrate. **Esci dall'area ricercatore** termina l'accesso per quella sessione del browser. Il parametro precedente `?preview=1` è un pannello di sviluppo della singola sessione, non sostituisce l'area ricercatore protetta.
 
@@ -130,6 +149,7 @@ Il file SQLite rimane dopo un riavvio solo se il disco resta disponibile. Il dis
 ## Codice e controlli
 
 - `app.py`: consenso, sessione, fasi e collegamento al componente.
+- `participant_data.py`: opzioni, validazione ed esportazione dei dati dichiarati dal partecipante.
 - `stimulus_catalog.py`: lettura, validazione e selezione dal manifest.
 - `validate_stimuli.py`: controllo del catalogo da terminale.
 - `recognition.py`: piano OLD/NEW e valutazione delle risposte.
