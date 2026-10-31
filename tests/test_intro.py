@@ -18,6 +18,9 @@ class IntroductionTests(unittest.TestCase):
         storage = patch("event_store.save_events")
         self.storage = storage.start()
         self.addCleanup(storage.stop)
+        deleted = patch("event_store.is_session_deleted", return_value=False)
+        deleted.start()
+        self.addCleanup(deleted.stop)
 
     def test_consent_is_required_and_can_be_unchecked(self):
         app = AppTest.from_file(str(APP)).run()

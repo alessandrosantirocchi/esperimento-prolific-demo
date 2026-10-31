@@ -26,6 +26,9 @@ class ResearchDashboardTests(unittest.TestCase):
         reader = patch("research_dashboard.read_events", return_value=RECORDS)
         self.reader = reader.start()
         self.addCleanup(reader.stop)
+        deletion = patch("research_dashboard.delete_sessions", return_value={"sessions": 1, "events": 1})
+        self.deletion = deletion.start()
+        self.addCleanup(deletion.stop)
 
     def app(self):
         app = AppTest.from_file(str(APP))
@@ -52,6 +55,36 @@ class ResearchDashboardTests(unittest.TestCase):
         self.assertEqual(len(app.error), 1)
         self.assertEqual(app.text_input[0].value, "")
         self.reader.assert_not_called()
+        self.deletion.assert_not_called()
+
+    def test_deletion_requires_selection_and_explicit_confirmation(self):
+        app = self.app()
+        self.login(app)
+        button = next(b for b in app.button if b.label == "Elimina le sessioni selezionate")
+        self.assertTrue(button.disabled)
+        selector = next(m for m in app.multiselect if m.key == "research_delete_sessions")
+        selector.set_value(["s1"]).run()
+        next(b for b in app.button if b.label == "Elimina le sessioni selezionate").click().run()
+        self.assertFalse(app.exception)
+        self.deletion.assert_not_called()
+        next(b for b in app.button if b.label == "Elimina definitivamente").click().run()
+        self.assertFalse(app.exception)
+        self.deletion.assert_not_called()
+        next(t for t in app.text_input if t.key == "research_delete_confirmation").set_value("ELIMINA")
+        next(b for b in app.button if b.label == "Elimina definitivamente").click().run()
+        self.assertFalse(app.exception)
+        self.deletion.assert_called_once_with(["s1"])
+
+    def test_password_rotation_cancels_pending_deletion(self):
+        app = self.app()
+        self.login(app)
+        next(m for m in app.multiselect if m.key == "research_delete_sessions").set_value(["s1"]).run()
+        next(b for b in app.button if b.label == "Elimina le sessioni selezionate").click().run()
+        self.password.return_value = "rotated-test-access"
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertNotIn("research_pending_delete", app.session_state)
+        self.deletion.assert_not_called()
 
     def test_authenticated_downloads_logout_and_rotation(self):
         app = self.app()

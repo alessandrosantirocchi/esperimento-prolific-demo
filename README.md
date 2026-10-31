@@ -118,7 +118,15 @@ Dopo l'accesso:
 - **Registro like/dislike (CSV)** include anche le rimozioni; **Reazioni finali per volto (CSV)** riporta LIKE, DISLIKE o NONE dopo una rimozione, separatamente per sessione e volto. I volti senza alcuna reazione non compaiono nel riepilogo.
 - **Registro completo (CSV)** esporta tutti gli eventi filtrati. La copia **JSON** conserva i valori originali e i metadati; nei CSV i testi interpretabili come formule dai fogli di calcolo vengono protetti con un apostrofo.
 
-L'anteprima a schermo è limitata a 500 risposte di memoria; i download includono tutte le righe filtrate. Nessuna azione della sezione cancella o modifica i dati. Il database non viene caricato da GitHub e non si recuperano database persi durante precedenti redeploy. La sezione di esportazione non sostituisce lo storage persistente e i backup necessari per uno studio reale.
+L'anteprima a schermo è limitata a 500 risposte di memoria; i download includono tutte le righe filtrate. I download non modificano i dati. Il database non viene caricato da GitHub e non si recuperano database persi durante precedenti redeploy. La sezione di esportazione non sostituisce lo storage persistente e i backup necessari per uno studio reale.
+
+### Cancellare le sessioni di prova
+
+Nell'Area ricercatore autenticata aprire **Elimina sessioni di prova**. Selezionare le singole sessioni (la data è nell'orario di Roma), oppure usare **Seleziona tutte le sessioni mostrate** per sceglierle esplicitamente tutte. Senza selezione il pulsante è disabilitato. Le sessioni con lo stesso `participant_id`, incluso `DEMO_SESSION`, restano indipendenti.
+
+**Elimina le sessioni selezionate** apre una conferma con gli ID, il numero di sessioni e il numero di eventi interessati. È possibile scaricare una copia JSON oppure annullare. Per cancellare occorre scrivere **ELIMINA** e premere **Elimina definitivamente**. La cancellazione rimuove l'intera sessione (consenso, piano, feed e memoria), anche se il filtro principale mostra una sola fase. Non è disponibile un annullamento successivo nell'app; le copie già scaricate non vengono cancellate.
+
+L'operazione è atomica e riguarda soltanto gli ID selezionati. Il database conserva solo ID e orario di cancellazione nella tabella `deleted_sessions` per impedire che ritardi di rete o schede ancora aperte ricreino le risposte eliminate. Non conserva lì le risposte. Una sessione cancellata viene fermata al successivo aggiornamento; per una nuova prova si ricarica la pagina. L'autenticazione viene verificata nuovamente nella conferma di cancellazione.
 
 ## Fase di memoria OLD/NEW
 

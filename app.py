@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import streamlit as st
-from event_store import save_events
+from event_store import save_events, SessionDeletedError, is_session_deleted
 from recognition import make_plan, score_response
 from image_assets import prepare_image
 from export_data import csv_bytes as export_csv
@@ -237,6 +237,18 @@ if "feed_events" not in st.session_state:
 if "recording_session_id" not in st.session_state:
     st.session_state.recording_session_id = str(uuid.uuid4())
 
+try:
+    deleted = is_session_deleted(st.session_state.recording_session_id)
+except (sqlite3.Error, OSError):
+    st.error("Il database non è disponibile. Riprova senza chiudere la pagina.")
+    st.stop()
+if st.session_state.get("recording_deleted", False) or deleted:
+    st.session_state.feed_events = []
+    st.session_state.seen_event_ids = set()
+    st.session_state.recording_deleted = True
+    st.info("Questa sessione è stata eliminata dal ricercatore. Per iniziare una nuova prova, ricarica la pagina.")
+    st.stop()
+
 phase = st.session_state.experiment_phase
 if phase == "recognition_intro":
     with st.container(key="recognition_info"):
@@ -250,6 +262,9 @@ if phase == "recognition_intro":
                      "phase": "recognition", "server_received_ts": datetime.now(timezone.utc).isoformat()}
             try:
                 save_events(st.session_state.recording_session_id, [event])
+            except SessionDeletedError:
+                st.session_state.recording_deleted = True
+                st.rerun()
             except (sqlite3.Error, OSError):
                 st.error("Impossibile salvare l'avvio. Riprova senza chiudere la pagina.")
             else:
@@ -414,6 +429,9 @@ try:
             st.session_state.experiment_phase = "recognition_intro"
             st.rerun()
         st.rerun()
+except SessionDeletedError:
+    st.session_state.recording_deleted = True
+    st.rerun()
 except (sqlite3.Error, OSError):
     st.error("Non è stato possibile salvare le interazioni. Lascia aperta questa pagina e riprova.")
     if st.button("Riprova il salvataggio"):
