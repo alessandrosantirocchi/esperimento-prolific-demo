@@ -4,9 +4,11 @@ export default function (component) {
   const { parentElement, data, setStateValue } = component;
   const root = parentElement.querySelector('#instalab-root');
   if (!root) return;
-  const posts = Array.isArray(data?.posts) ? data.posts : [];
+  const posts = Array.isArray(data?.posts) ? data.posts.map(p=>({...p,image_url:p.image_url || data?.image_sources?.[p.image_key] || ''})) : [];
   const stories = Array.isArray(data?.stories) ? data.stories : [];
   const participantId = data?.participant_id || 'DEMO_SESSION';
+  const recognition = data?.phase === 'recognition';
+  const phaseToken = `${data?.phase || 'feed'}:${recognition ? posts[0]?.id : ''}`;
   const escape = (v) => String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
   const shorten = (n) => new Intl.NumberFormat('it-IT').format(n);
   const ico = (name, filled=false, size=25) => {
@@ -39,10 +41,10 @@ export default function (component) {
   const timeLabel = (m) => m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m/60)} h` : `${Math.floor(m/1440)} g`;
   const history = Array.isArray(data?.history) ? data.history : [];
   let s = root.__instalab_state;
-  if (!s || s.participantId !== participantId) {
-    s = { participantId, tab:'home', overlay:null, overlayPost:null, storyIndex:0, query:'',
+  if (!s || s.participantId !== participantId || s.phaseToken !== phaseToken) {
+    s = { participantId, phaseToken, tab:'home', overlay:null, overlayPost:null, storyIndex:0, query:'',
           liked:new Set(), disliked:new Set(), saved:new Set(), followed:new Set(), comments:{}, expanded:new Set(),
-          events:history.slice(), started:Date.now(), seen:new Set() };
+          events:history.slice(), started:Date.now(), seen:new Set(), choice:null, shownAt:null, resetScroll:true };
     for (const e of history) {
       if (e.event_type === 'like') s.liked.add(e.post_id);
       if (e.event_type === 'unlike') s.liked.delete(e.post_id);
@@ -55,7 +57,7 @@ export default function (component) {
       if (e.event_type === 'comment_submit') {
         (s.comments[e.post_id] ||= []).push({ username:'you', text:e.details?.text || '' });
       }
-      if (e.event_id) s.seen.add(e.event_id);
+      if (e.event_type === 'post_impression') s.seen.add(e.post_id);
     }
     root.__instalab_state = s;
   }
@@ -120,7 +122,18 @@ export default function (component) {
        </div>
      </article>`;
   };
-  const home = () => `<div class="feed-area"><main class="timeline">${storyList()}<div class="post-list">${posts.map(post).join('')}</div><div class="end-feed"><div class="end-check">${ico('check')}</div><strong>Sei in pari</strong><span>Hai visto tutti i post di questa simulazione</span></div></main></div>`;
+  const recognitionCard = (p) => {
+    const r = p.image_region;
+    const style = r ? `position:absolute;max-width:none;width:${r.source_width/r.width*100}%;height:auto;left:${-r.x/r.width*100}%;top:${-r.y/r.height*100}%;` : `object-position:${escape(p.image_position || 'center')};`;
+    return `<div class="feed-area recognition-area"><main class="timeline">
+      <header class="recognition-heading"><span>Memoria di riconoscimento</span><h1>Hai già visto questo volto?</h1><p>Volto ${data.trial_number} di ${data.trial_total}</p></header>
+      <article class="post recognition-post" data-post="${escape(p.id)}">
+        <div class="photo-wrap"><img class="post-photo recognition-photo" style="${style}" src="${escape(p.image_url)}" alt="Volto da riconoscere" /></div>
+        <div class="recognition-actions">${['OLD','NEW'].map(choice=>`<button data-action="recognition_response" data-post="${escape(p.id)}" data-choice="${choice}" aria-pressed="${s.choice===choice}" disabled><strong>${choice}</strong><span>${choice==='OLD'?'Già visto':'Nuovo'}</span></button>`).join('')}</div>
+        <p class="recognition-status" aria-live="polite">${s.choice?'Risposta selezionata. Salvataggio in corso…':'Scegli OLD se hai visto il volto nel feed precedente, NEW se è nuovo.'}</p>
+      </article></main></div>`;
+  };
+  const home = () => `<div class="feed-area"><main class="timeline">${storyList()}<div class="post-list">${posts.map(post).join('')}</div><div class="end-feed"><div class="end-check">${ico('check')}</div><strong>Hai raggiunto la fine del feed</strong><span>${data?.phase1_ready?'Puoi proseguire.':'Scorri tutti i volti prima di proseguire. Attendi il salvataggio delle visualizzazioni.'}</span><button class="phase-next" data-action="begin_recognition" ${data?.phase1_ready?'':'disabled'}>Continua</button></div></main></div>`;
   const explore = (savedOnly=false) => `<section class="other-page"><header class="other-header"><h2>${savedOnly?'Elementi salvati':'Esplora'}</h2><p>${savedOnly?'I post che hai salvato':'Scopri i post della simulazione'}</p></header><div class="explore-grid">${posts.filter(p=>!savedOnly||s.saved.has(p.id)).map(p=>`<button class="explore-tile" data-action="open_post" data-post="${escape(p.id)}"><img src="${escape(p.image_url)}" alt=""/><span>${ico('heart',true,18)} ${shorten(Number(p.initial_likes)||0)}</span></button>`).join('')||'<div class="empty-state">Non hai ancora salvato nessun post.</div>'}</div></section>`;
   const search = () => `<section class="other-page"><header class="other-header"><h2>Cerca</h2><p>Cerca profili e post dimostrativi</p></header><div class="search-box">${ico('search')}<input autofocus class="search-input" type="search" placeholder="Cerca" value="${escape(s.query)}" aria-label="Cerca nel feed" /></div><div class="search-results">${posts.filter(p=>p.username.toLowerCase().includes(s.query.toLowerCase())||p.caption.toLowerCase().includes(s.query.toLowerCase())).map(p=>`<button class="search-result" data-action="open_post" data-post="${escape(p.id)}">${profileAvatar(p.avatar_url)}<span><strong>${escape(p.username)}</strong><small>${escape(p.location)}</small></span>${ico('chevron',false,18)}</button>`).join('')}</div></section>`;
   const profile = () => `<section class="other-page profile-page"><div class="profile-header"><span class="large-avatar">${ico('profile',false,48)}</span><div><div class="profile-username">you.research <span class="demo-tag">Account demo</span></div><div class="profile-stats"><span><strong>0</strong> post</span><span><strong>0</strong> follower</span><span><strong>${s.followed.size}</strong> seguiti</span></div><p>Profilo di simulazione per studi di ricerca.</p></div></div><div class="profile-tabs"><button class="active">${ico('grid',false,17)} Post</button><button data-action="nav" data-tab="saved">${ico('bookmark',false,17)} Elementi salvati</button></div><div class="empty-state">I post del feed sono esempi, non appartengono a questo profilo.</div></section>`;
@@ -145,15 +158,34 @@ export default function (component) {
   };
 
   const render = () => {
-    const y=window.scrollY;
-    const body = s.tab==='home'?home():s.tab==='explore'?explore():s.tab==='saved'?explore(true):s.tab==='search'?search():s.tab==='profile'?profile():misc(s.tab);
+    const y=s.resetScroll?0:window.scrollY;
+    s.resetScroll=false;
+    const body = recognition ? recognitionCard(posts[0]) : s.tab==='home'?home():s.tab==='explore'?explore():s.tab==='saved'?explore(true):s.tab==='search'?search():s.tab==='profile'?profile():misc(s.tab);
     root.innerHTML = `<div class="instalab-shell"><div class="page-content">${body}</div>${modal()}</div>`;
     window.requestAnimationFrame(()=>window.scrollTo({top:y,behavior:'instant'}));
+    if (recognition) {
+      const image = root.querySelector('.recognition-photo');
+      const ready = () => window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{
+        if (!root.isConnected || !image.isConnected || !image.naturalWidth) return;
+        if (s.shownAt === null) {s.shownAt = performance.now(); s.shownAtClient = new Date().toISOString();}
+        root.querySelectorAll('[data-action="recognition_response"]').forEach(button=>{button.disabled=!!s.choice;});
+      }));
+      image.onload=ready;
+      image.onerror=()=>{root.querySelector('.recognition-status').textContent='Immagine non disponibile. Non rispondere e contatta il ricercatore.';};
+      if(image.complete && image.naturalWidth) ready();
+    }
   };
 
   const perform = (btn) => {
     const action=btn.dataset.action;
     const id=btn.dataset.post||null;
+    if (recognition) {
+      if(action!=='recognition_response' || s.choice || s.shownAt===null || btn.disabled) return;
+      s.choice=btn.dataset.choice;
+      signal('recognition_response',id,{response:s.choice,response_time_ms:Math.round(performance.now()-s.shownAt),displayed_client_ts:s.shownAtClient});
+      render();return;
+    }
+    if(action==='begin_recognition') {if(data?.phase1_ready)signal('begin_recognition');return;}
     if(action==='nav') { s.tab=btn.dataset.tab; s.overlay=null; signal('navigate',null,{page:s.tab}); window.scrollTo(0,0); }
     else if(action==='like') {
       if(s.disliked.delete(id))signal('remove_dislike',id);
@@ -202,6 +234,7 @@ export default function (component) {
     }
   };
   root.ondblclick = (e) => {
+    if(recognition)return;
     const p=e.target.closest('[data-doublepost]');if(!p)return;
     const id=p.dataset.doublepost;
     if(s.disliked.delete(id))signal('remove_dislike',id);
@@ -211,11 +244,16 @@ export default function (component) {
     window.setTimeout(()=>{if(root.isConnected)render();},300);
   };
   // Track first impressions for each post; exact dwell time needs experimental validation.
-  if(typeof IntersectionObserver!=='undefined' && s.tab==='home' && !s.overlay){
+  if(!recognition && typeof IntersectionObserver!=='undefined' && s.tab==='home' && !s.overlay){
     observer=new IntersectionObserver(entries=>{
       for(const entry of entries){
         const id=entry.target.getAttribute('data-post');
         if(entry.isIntersecting&&!s.seen.has(id)){
+          const image=entry.target.querySelector('.post-photo');
+          if(image && (!image.complete || !image.naturalWidth)) {
+            image.addEventListener('load',()=>{if(observer && root.contains(entry.target)){observer.unobserve(entry.target);observer.observe(entry.target);}},{once:true});
+            continue;
+          }
           s.seen.add(id);signal('post_impression',id,{threshold:0.6});
         }
       }

@@ -58,10 +58,12 @@ if __name__ == "__main__":
     rows = read_events()
     columns = ["session_id", "event_id", "participant_id", "event_type", "post_id",
                "stimulus_id", "stimulus_type", "client_ts", "server_received_ts",
-               "elapsed_ms", "details"]
+               "phase", "trial_id", "response", "target", "correct", "response_time_ms",
+               "displayed_client_ts", "elapsed_ms", "details"]
     with args.output.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=columns, extrasaction="ignore")
         writer.writeheader()
         for row in rows:
-            writer.writerow(dict(row, details=json.dumps(row.get("details", {}), ensure_ascii=False)))
+            details = row.get("details", {})
+            writer.writerow({**details, **row, "details": json.dumps(details, ensure_ascii=False)})
     print(f"Exported {len(rows)} events.")

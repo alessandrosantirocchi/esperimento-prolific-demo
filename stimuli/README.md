@@ -9,3 +9,9 @@ This is a temporary development set, not the participant's LISTA A archive and n
 - Every post uses neutral account names, no source/category caption, no stimulus-based avatar, no prefilled comments and identical initial like counts. Stories are empty to avoid extra exposures before feed presentation. The order is shuffled per session and retained across interactions. It is not counterbalanced across participants and no persistent assignment database is configured.
 
 The source metadata is for researchers. It is not displayed as a real/synthetic label in the participant interface.
+
+## Recognition-only lures
+
+`posts.json` also contains `recognition_new_posts`, excluded from phase 1: five additional photographs from the MIT-licensed `ageitgey/face_recognition` examples (Alex Lacamoire, Lin-Manuel Miranda, Joe Biden, Kit Harington and Rose Leslie), and five previously unused SFHQ source-sheet tiles (second row, columns 3–7). Exact source paths, commits and regions are recorded in `sources.json`. These ten identities are distinct from the phase-1 set. Their familiarity and image conditions are not experimentally matched.
+
+The recognition task samples five old real and five old synthetic faces from phase 1, then shuffles them with these ten lures. Recognition cards use generic labels, not the original account names or reaction counts. No class or correctness feedback is displayed to participants.

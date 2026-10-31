@@ -354,5 +354,142 @@
         "source_width": 3664
       }
     }
+  ],
+  "recognition_new_posts": [
+    {
+      "id": "N001",
+      "stimulus_id": "LURE001",
+      "stimulus_type": "real",
+      "image": "stimuli/lure_01.png",
+      "avatar": "",
+      "username": "",
+      "caption": "",
+      "comments": []
+    },
+    {
+      "id": "N002",
+      "stimulus_id": "LURE002",
+      "stimulus_type": "real",
+      "image": "stimuli/lure_02.png",
+      "avatar": "",
+      "username": "",
+      "caption": "",
+      "comments": []
+    },
+    {
+      "id": "N003",
+      "stimulus_id": "LURE003",
+      "stimulus_type": "real",
+      "image": "stimuli/lure_03.jpg",
+      "avatar": "",
+      "username": "",
+      "caption": "",
+      "comments": []
+    },
+    {
+      "id": "N004",
+      "stimulus_id": "LURE004",
+      "stimulus_type": "real",
+      "image": "stimuli/lure_04.jpg",
+      "avatar": "",
+      "username": "",
+      "caption": "",
+      "comments": []
+    },
+    {
+      "id": "N005",
+      "stimulus_id": "LURE005",
+      "stimulus_type": "real",
+      "image": "stimuli/lure_05.jpg",
+      "avatar": "",
+      "username": "",
+      "caption": "",
+      "comments": []
+    },
+    {
+      "id": "N006",
+      "stimulus_id": "LURE006",
+      "stimulus_type": "deepfake",
+      "image": "stimuli/sfhq_sample.jpg",
+      "image_region": {
+        "x": 928,
+        "y": 519,
+        "width": 440,
+        "height": 440,
+        "source_width": 3664
+      },
+      "avatar": "",
+      "username": "",
+      "caption": "",
+      "comments": []
+    },
+    {
+      "id": "N007",
+      "stimulus_id": "LURE007",
+      "stimulus_type": "deepfake",
+      "image": "stimuli/sfhq_sample.jpg",
+      "image_region": {
+        "x": 1386,
+        "y": 519,
+        "width": 440,
+        "height": 440,
+        "source_width": 3664
+      },
+      "avatar": "",
+      "username": "",
+      "caption": "",
+      "comments": []
+    },
+    {
+      "id": "N008",
+      "stimulus_id": "LURE008",
+      "stimulus_type": "deepfake",
+      "image": "stimuli/sfhq_sample.jpg",
+      "image_region": {
+        "x": 1844,
+        "y": 519,
+        "width": 440,
+        "height": 440,
+        "source_width": 3664
+      },
+      "avatar": "",
+      "username": "",
+      "caption": "",
+      "comments": []
+    },
+    {
+      "id": "N009",
+      "stimulus_id": "LURE009",
+      "stimulus_type": "deepfake",
+      "image": "stimuli/sfhq_sample.jpg",
+      "image_region": {
+        "x": 2302,
+        "y": 519,
+        "width": 440,
+        "height": 440,
+        "source_width": 3664
+      },
+      "avatar": "",
+      "username": "",
+      "caption": "",
+      "comments": []
+    },
+    {
+      "id": "N010",
+      "stimulus_id": "LURE010",
+      "stimulus_type": "deepfake",
+      "image": "stimuli/sfhq_sample.jpg",
+      "image_region": {
+        "x": 2760,
+        "y": 519,
+        "width": 440,
+        "height": 440,
+        "source_width": 3664
+      },
+      "avatar": "",
+      "username": "",
+      "caption": "",
+      "comments": []
+    }
   ]
 }

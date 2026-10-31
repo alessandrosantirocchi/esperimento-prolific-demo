@@ -54,6 +54,9 @@ class IntroductionTests(unittest.TestCase):
         self.assertEqual(len(app.checkbox), 0)
         self.assertEqual(app.session_state["intro_consent_accepted_at"], timestamp)
         self.assertEqual(app.session_state["feed_post_order"], order)
+        assignments = [e for e in app.session_state["feed_events"] if e["event_type"] == "recognition_plan_assigned"]
+        self.assertEqual(len(assignments), 1)
+        self.assertEqual(assignments[0]["details"]["recognition_plan"], app.session_state["recognition_plan"])
 
     def test_provisional_stimuli_are_balanced_and_available(self):
         posts = json.loads((APP.parent / "posts.json").read_text())["posts"]
@@ -80,6 +83,23 @@ class IntroductionTests(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertEqual(len(app.error), 0)
         self.assertEqual(app.session_state["feed_events"][0]["event_type"], "session_started")
+
+    def test_memory_instructions_appear_only_after_first_phase(self):
+        app = AppTest.from_file(str(APP)).run()
+        app.checkbox[0].check().run()
+        app.button[0].click().run()
+        self.assertFalse(app.exception)
+        self.assertFalse(any("Hai già visto" in title.value for title in app.title))
+        plan = list(app.session_state["recognition_plan"])
+        app.session_state["experiment_phase"] = "recognition_intro"
+        app.run()
+        self.assertEqual(app.title[0].value, "Hai già visto questo volto?")
+        self.assertTrue(any("OLD — Già visto" in text.value for text in app.markdown))
+        app.button[0].click().run()
+        self.assertFalse(app.exception)
+        self.assertEqual(app.session_state["experiment_phase"], "recognition")
+        self.assertEqual(app.session_state["recognition_plan"], plan)
+        self.assertTrue(any(e["event_type"] == "recognition_started" for e in app.session_state["feed_events"]))
 
 
 if __name__ == "__main__":

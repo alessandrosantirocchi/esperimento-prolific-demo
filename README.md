@@ -97,3 +97,20 @@ python event_store.py --output /percorso/privato/interazioni.csv
 Il database e gli export contengono dati di ricerca: conservarli fuori da Git e dalle cartelle pubbliche, limitare l'accesso e definire conservazione e backup prima del reclutamento. Errori di scrittura non vengono conteggiati come salvataggi riusciti: la pagina offre un pulsante per riprovare. Non chiudere la pagina finché il problema non è risolto.
 
 Il feed non offre più condivisione, invio o copia di link dei post. `anteprima.html` resta una dimostrazione frontend senza backend: per registrare gli eventi avviare `app.py` con Streamlit.
+
+## Fase di memoria OLD/NEW
+
+La pagina iniziale non anticipa il compito di memoria. Dopo aver scorso i 20 volti del feed con like/dislike, il pulsante **Continua** apre le istruzioni del riconoscimento. Il pulsante è disponibile quando le 20 visualizzazioni sono state registrate sul server (immagine caricata e almeno il 60% del post visibile). Non è necessario mettere una reazione a ogni post.
+
+Da **Inizia il riconoscimento** si passa a 20 prove, una fotografia per volta, con lo stesso stile del feed e due pulsanti al posto delle reazioni:
+
+- **OLD — Già visto**: volto presente nel feed precedente.
+- **NEW — Nuovo**: volto non presente nel feed precedente.
+
+Per sessione vengono estratti casualmente 10 OLD dai 20 volti della prima fase (5 reali e 5 sintetici), mescolati con 10 NEW (5 reali e 5 sintetici) definiti in `recognition_new_posts` in `posts.json`. I NEW non vengono mostrati nella prima fase. Le regioni sintetiche condividono il foglio sorgente, i cui byte completi sono disponibili al browser: questa demo non è progettata per impedire l’ispezione degli asset. Il piano viene fissato e salvato all'avvio della sessione. Gli ID delle prove visualizzati nel browser non indicano OLD/NEW e non si riutilizzano nomi, commenti o conteggi del feed come indizi di riconoscimento.
+
+Ogni prova accetta una sola scelta. La prova successiva compare dopo il salvataggio; non viene mostrato un feedback di correttezza. Le risposte e l'evento di completamento usano lo stesso database e la stessa sessione/PID della prima fase. La confidenza non è implementata.
+
+Negli export CSV sono presenti `phase`, `trial_id`, `response`, `target`, `correct`, `response_time_ms` e `displayed_client_ts`, oltre a post, stimolo e timestamp server. La correttezza viene calcolata dal server rispetto al piano di presentazione. Il tempo di risposta è una stima nel browser dal caricamento/visualizzazione dell'immagine al clic, non una misura validata per esperimenti di timing preciso; include eventuali interruzioni o schede in background. L'app non garantisce persistenza della sessione del browser dopo refresh o chiusura, né ripresa autenticata dal PID.
+
+È un protocollo provvisorio: proporzioni, bilanciamento, definizione di esposizione, tempi e familiarità delle fotografie vanno validati prima del reclutamento. Le istruzioni non dichiarano autorizzazioni etiche, durate o condizioni di conservazione non configurate.

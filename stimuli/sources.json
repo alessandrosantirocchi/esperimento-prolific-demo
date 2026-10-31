@@ -208,5 +208,120 @@
       "height": 440,
       "source_width": 3664
     }
+  },
+  {
+    "file": "stimuli/lure_01.png",
+    "class": "real",
+    "source_repository": "ageitgey/face_recognition",
+    "source_commit": "9f3061aaeed9a8756d2c970f5dfe066617a8281d",
+    "source_path": "examples/alex-lacamoire.png",
+    "use": "recognition_new"
+  },
+  {
+    "file": "stimuli/lure_02.png",
+    "class": "real",
+    "source_repository": "ageitgey/face_recognition",
+    "source_commit": "9f3061aaeed9a8756d2c970f5dfe066617a8281d",
+    "source_path": "examples/lin-manuel-miranda.png",
+    "use": "recognition_new"
+  },
+  {
+    "file": "stimuli/lure_03.jpg",
+    "class": "real",
+    "source_repository": "ageitgey/face_recognition",
+    "source_commit": "9f3061aaeed9a8756d2c970f5dfe066617a8281d",
+    "source_path": "examples/biden.jpg",
+    "use": "recognition_new"
+  },
+  {
+    "file": "stimuli/lure_04.jpg",
+    "class": "real",
+    "source_repository": "ageitgey/face_recognition",
+    "source_commit": "9f3061aaeed9a8756d2c970f5dfe066617a8281d",
+    "source_path": "examples/knn_examples/test/johnsnow_test1.jpg",
+    "use": "recognition_new"
+  },
+  {
+    "file": "stimuli/lure_05.jpg",
+    "class": "real",
+    "source_repository": "ageitgey/face_recognition",
+    "source_commit": "9f3061aaeed9a8756d2c970f5dfe066617a8281d",
+    "source_path": "examples/knn_examples/train/rose_leslie/img1.jpg",
+    "use": "recognition_new"
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 928,
+      "y": 519,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    },
+    "use": "recognition_new"
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 1386,
+      "y": 519,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    },
+    "use": "recognition_new"
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 1844,
+      "y": 519,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    },
+    "use": "recognition_new"
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 2302,
+      "y": 519,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    },
+    "use": "recognition_new"
+  },
+  {
+    "file": "stimuli/sfhq_sample.jpg",
+    "class": "deepfake",
+    "source_repository": "SelfishGene/SFHQ-dataset",
+    "source_commit": "4c898bc7936c19c201a163c4d636943e80d7bc19",
+    "source_path": "images/SFHQ_sample_4x8.jpg",
+    "region": {
+      "x": 2760,
+      "y": 519,
+      "width": 440,
+      "height": 440,
+      "source_width": 3664
+    },
+    "use": "recognition_new"
   }
 ]

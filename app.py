@@ -10,6 +10,7 @@ import base64
 import csv
 import io
 import json
+import math
 import random
 import sqlite3
 import uuid
@@ -18,6 +19,7 @@ from pathlib import Path
 
 import streamlit as st
 from event_store import save_events
+from recognition import make_plan, score_response
 
 BASE = Path(__file__).resolve().parent
 st.set_page_config(
@@ -40,6 +42,8 @@ st.markdown(
       div[data-testid="stElementContainer"] { margin: 0 !important; }
       /* Impression events trigger reruns; keep the stimulus at full opacity. */
       .st-key-instalab_main_feed { opacity: 1 !important; transition: none !important; }
+      .st-key-recognition_info {max-width:700px;margin:48px auto;padding:24px;color:#202027;}
+      .st-key-recognition_info h1, .st-key-recognition_info p {color:#202027;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -62,9 +66,14 @@ def local_image_data(filename: str) -> str:
 
 def load_stimuli() -> dict:
     raw = json.loads((BASE / "posts.json").read_text(encoding="utf-8"))
-    for post in raw.get("posts", []):
-        post["image_url"] = local_image_data(post.get("image", ""))
-        post["avatar_url"] = local_image_data(post.get("avatar", post.get("image", "")))
+    images = {}
+    def image_data(filename):
+        if filename not in images:
+            images[filename] = local_image_data(filename)
+        return images[filename]
+    for post in raw.get("posts", []) + raw.get("recognition_new_posts", []):
+        post["image_url"] = image_data(post.get("image", ""))
+        post["avatar_url"] = image_data(post.get("avatar", post.get("image", "")))
     for story in raw.get("stories", []):
         story["image_url"] = local_image_data(story.get("image", ""))
     return raw
@@ -81,13 +90,14 @@ def export_csv(events: list[dict]) -> bytes:
     stream = io.StringIO()
     columns = ["session_id", "event_id", "participant_id", "event_type", "post_id",
                "stimulus_id", "stimulus_type", "client_ts", "server_received_ts",
-               "elapsed_ms", "details"]
+               "phase", "trial_id", "response", "target", "correct", "response_time_ms",
+               "displayed_client_ts", "elapsed_ms", "details"]
     writer = csv.DictWriter(stream, fieldnames=columns)
     writer.writeheader()
     for event in events:
         writer.writerow({k: (
             json.dumps(event.get(k, {}), ensure_ascii=False) if k == "details"
-            else event.get(k, "")
+            else event.get(k, event.get("details", {}).get(k, ""))
         ) for k in columns})
     return stream.getvalue().encode("utf-8-sig")
 
@@ -224,12 +234,70 @@ if (
         list(posts_by_id), k=len(posts_by_id)
     )
 ordered_posts = [posts_by_id[post_id] for post_id in st.session_state.feed_post_order]
+all_posts_by_id = {p["id"]: p for p in study.get("posts", []) + study.get("recognition_new_posts", [])}
+if "recognition_plan" not in st.session_state:
+    st.session_state.recognition_plan = make_plan(study["posts"], study.get("recognition_new_posts", []))
+if "experiment_phase" not in st.session_state:
+    st.session_state.experiment_phase = "feed"
 
 if "feed_events" not in st.session_state:
     st.session_state.feed_events = []
     st.session_state.seen_event_ids = set()
 if "recording_session_id" not in st.session_state:
     st.session_state.recording_session_id = str(uuid.uuid4())
+
+phase = st.session_state.experiment_phase
+if phase == "recognition_intro":
+    with st.container(key="recognition_info"):
+        st.title("Hai già visto questo volto?")
+        st.write("Ora vedrai alcuni volti del feed precedente insieme a volti nuovi. Per ogni fotografia, indica se ricordi di averla vista nella prima parte.")
+        st.markdown("**OLD — Già visto:** il volto era presente nel feed precedente.\n\n**NEW — Nuovo:** il volto non era presente nel feed precedente.")
+        st.write("Scegli una sola risposta per ogni volto. Dopo la scelta passerai alla fotografia successiva. Non verrà mostrato se la risposta è corretta.")
+        if st.button("Inizia il riconoscimento", type="primary"):
+            event = {"event_id": "recognition_started", "event_type": "recognition_started",
+                     "participant_id": participant_id, "session_id": st.session_state.recording_session_id,
+                     "phase": "recognition", "server_received_ts": datetime.now(timezone.utc).isoformat()}
+            try:
+                save_events(st.session_state.recording_session_id, [event])
+            except (sqlite3.Error, OSError):
+                st.error("Impossibile salvare l'avvio. Riprova senza chiudere la pagina.")
+            else:
+                st.session_state.feed_events.append(event)
+                st.session_state.seen_event_ids.add(event["event_id"])
+                st.session_state.experiment_phase = "recognition"
+                st.rerun()
+    st.stop()
+
+answered_ids = {e["post_id"] for e in st.session_state.feed_events if e.get("event_type") == "recognition_response"}
+remaining_trials = [t for t in st.session_state.recognition_plan if t["post_id"] not in answered_ids]
+if phase == "recognition" and not remaining_trials:
+    with st.container(key="recognition_info"):
+        st.title("Prova completata")
+        st.write("Grazie per la partecipazione. Tutte le risposte sono state salvate sul server.")
+        if str(st.query_params.get("preview", "0")) == "1":
+            st.download_button("Scarica interazioni CSV", export_csv(st.session_state.feed_events),
+                               "instalab_interazioni.csv", "text/csv")
+    st.stop()
+
+seen_posts = {e.get("post_id") for e in st.session_state.feed_events if e.get("event_type") == "post_impression" and e.get("phase", "feed") == "feed"}
+phase1_ready = set(posts_by_id) <= seen_posts
+visible_posts = ordered_posts if phase == "feed" else [all_posts_by_id[remaining_trials[0]["post_id"]]]
+# Recognition receives only display data, never the answer key or old/new labels.
+if phase == "recognition":
+    visible_posts = [{k: p[k] for k in ("id", "image_url", "image_region", "image_position") if k in p} for p in visible_posts]
+    visible_posts[0]["id"] = remaining_trials[0]["trial_id"]
+
+# Send shared source sheets once, rather than once per tile on every event.
+image_sources = {}
+image_keys = {}
+component_posts = []
+for post in visible_posts:
+    image_url = post.get("image_url", "")
+    if image_url not in image_keys:
+        image_keys[image_url] = f"asset-{len(image_keys)}"
+        image_sources[image_keys[image_url]] = image_url
+    component_posts.append({**{k: v for k, v in post.items() if k != "image_url"},
+                            "image_key": image_keys[image_url]})
 
 feed_component = st.components.v2.component(
     "instalab_social_feed",
@@ -242,11 +310,18 @@ feed_component = st.components.v2.component(
 response = feed_component(
     key="instalab_main_feed",
     data={
-        "posts": ordered_posts,
-        "stories": study.get("stories", []),
+        "posts": component_posts,
+        "image_sources": image_sources,
+        "stories": study.get("stories", []) if phase == "feed" else [],
+        "phase": phase,
+        "phase1_ready": phase1_ready,
+        "trial_number": len(answered_ids) + 1,
+        "trial_total": len(st.session_state.recognition_plan),
         "title": study.get("display_name", "InstaLab"),
         "participant_id": participant_id,
-        "history": st.session_state.feed_events,
+        "history": [{k: v for k, v in e.items() if k != "details"} if e.get("event_type") in {"session_started", "recognition_plan_assigned"} else
+                    {**e, "details": {k: v for k, v in e.get("details", {}).items() if k not in {"target", "correct"}}}
+                    for e in st.session_state.feed_events],
     },
     default={"events": []},
     on_events_change=lambda: None,
@@ -257,6 +332,8 @@ response = feed_component(
 new_events = response.events or []
 pending_events = []
 pending_ids = set()
+batch_answered_ids = set(answered_ids)
+transition_requested = False
 for event in new_events:
     if not isinstance(event, dict):
         continue
@@ -265,15 +342,52 @@ for event in new_events:
         continue
     pending_ids.add(event_id)
     event = dict(event)
+    event["phase"] = phase
+    if event.get("event_type") == "begin_recognition":
+        if phase != "feed" or not phase1_ready:
+            continue
+        transition_requested = True
+    if phase == "recognition":
+        if event.get("event_type") != "recognition_response":
+            continue
+        trial = remaining_trials[0]
+        if event.get("post_id") != trial["trial_id"] or trial["post_id"] in batch_answered_ids:
+            continue
+        if not isinstance(event.get("details"), dict):
+            continue
+        rt = event["details"].get("response_time_ms")
+        if type(rt) not in {float, int} or not math.isfinite(rt) or rt < 0:
+            continue
+        event["trial_id"] = trial["trial_id"]
+        event["post_id"] = trial["post_id"]
+        try:
+            score = score_response(st.session_state.recognition_plan, event["post_id"], event.get("details", {}).get("response"))
+        except ValueError:
+            continue
+        event["details"] = {**event.get("details", {}), **score}
+        batch_answered_ids.add(event["post_id"])
+    elif event.get("event_type") == "recognition_response":
+        continue
     event["session_id"] = st.session_state.recording_session_id
     event["participant_id"] = participant_id
-    post = next((p for p in study.get("posts", []) if p.get("id") == event.get("post_id")), None)
+    post = all_posts_by_id.get(event.get("post_id"))
     event["stimulus_id"] = post.get("stimulus_id", "") if post else ""
     event["stimulus_type"] = post.get("stimulus_type", "") if post else ""
     event["server_received_ts"] = datetime.now(timezone.utc).isoformat()
     pending_events.append(event)
 
 try:
+    if not st.session_state.get("recognition_plan_recorded", False):
+        pending_events.append({"event_id": "recognition_plan_assigned", "event_type": "recognition_plan_assigned",
+                               "session_id": st.session_state.recording_session_id,
+                               "participant_id": participant_id,
+                               "server_received_ts": datetime.now(timezone.utc).isoformat(),
+                               "details": {"recognition_plan": st.session_state.recognition_plan}})
+    if phase == "recognition" and len(batch_answered_ids) == len(st.session_state.recognition_plan):
+        pending_events.append({"event_id": "recognition_completed", "event_type": "recognition_completed",
+                               "session_id": st.session_state.recording_session_id,
+                               "participant_id": participant_id, "phase": "recognition",
+                               "server_received_ts": datetime.now(timezone.utc).isoformat()})
     # Include consent and presentation order once, in the same durable batch.
     if not st.session_state.get("recording_initialized", False):
         pending_events.insert(0, {
@@ -282,13 +396,19 @@ try:
             "participant_id": participant_id,
             "server_received_ts": datetime.now(timezone.utc).isoformat(),
             "details": {"consent_accepted_at": st.session_state.intro_consent_accepted_at,
-                        "post_order": st.session_state.feed_post_order},
+                        "post_order": st.session_state.feed_post_order,
+                        "recognition_plan": st.session_state.recognition_plan},
         })
     if pending_events:
         save_events(st.session_state.recording_session_id, pending_events)
         st.session_state.feed_events.extend(pending_events)
         st.session_state.seen_event_ids.update(e["event_id"] for e in pending_events)
         st.session_state.recording_initialized = True
+        st.session_state.recognition_plan_recorded = True
+        if transition_requested:
+            st.session_state.experiment_phase = "recognition_intro"
+            st.rerun()
+        st.rerun()
 except (sqlite3.Error, OSError):
     st.error("Non è stato possibile salvare le interazioni. Lascia aperta questa pagina e riprova.")
     if st.button("Riprova il salvataggio"):
