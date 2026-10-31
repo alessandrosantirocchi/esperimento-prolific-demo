@@ -84,42 +84,63 @@ if not st.session_state.get("intro_consent_accepted", False):
         """
         <style>
           .st-key-study_intro {
-            width: min(100%, 760px); margin: 48px auto; padding: 40px;
-            border: 1px solid #e8e8ec; border-radius: 24px;
+            width: min(100% - 32px, 720px); margin: 36px auto; padding: 36px;
+            border: 1px solid #e9e9f0; border-radius: 24px;
             color: #17171b; background: #fff;
-            box-shadow: 0 16px 60px #17171b08;
+            box-shadow: 0 18px 64px #28203909;
           }
           .st-key-study_intro h1 {
-            font-size: clamp(2rem, 5vw, 3rem); line-height: 1.12;
-            letter-spacing: -0.04em; padding-top: 12px;
+            font-size: clamp(2rem, 5.2vw, 2.9rem); line-height: 1.1;
+            letter-spacing: -0.045em; padding: 0 0 12px;
           }
-          .st-key-study_intro h2 {font-size: 1.15rem; padding-top: 24px;}
           .st-key-study_intro {color-scheme: light;}
-          .st-key-study_intro h1, .st-key-study_intro h2,
+          .st-key-study_intro h1,
           .st-key-study_intro [data-testid="stMarkdownContainer"],
           .st-key-study_intro label, .st-key-study_intro summary {color:#202027;}
-          .st-key-study_intro p {line-height: 1.75;}
+          .st-key-study_intro p {line-height: 1.65;}
           .st-key-study_intro [data-testid="stCaptionContainer"],
           .st-key-study_intro [data-testid="stCaptionContainer"] p {color:#60606d;}
           .st-key-study_intro [data-testid="stExpander"] details {
             background:#f7f8fa; border:1px solid #e4e6ec; border-radius:14px;
-            margin:16px 0 8px;
+            margin:12px 0 8px;
           }
           .st-key-study_intro [data-testid="stExpander"] summary {font-weight:600;}
           .st-key-study_intro [data-testid="stExpander"] li {margin-bottom:8px;}
           .st-key-study_intro .intro-actions {
-            display:flex; flex-wrap:wrap; gap:8px; margin:16px 0 20px;
+            display:grid; grid-template-columns:repeat(3, minmax(0, 1fr));
+            gap:10px; margin:6px 0 20px;
           }
-          .st-key-study_intro .intro-actions span {
-            background:#f3f5f8; color:#414552; border:1px solid #e6e9ef;
-            border-radius:24px; padding:7px 15px; font-size:.9rem;
+          .st-key-study_intro .intro-action {
+            display:flex; align-items:center; justify-content:center; gap:9px;
+            padding:16px 8px; border:1px solid #ececf2; border-radius:14px;
+            background:#fcfcfe; font-size:.9rem; font-weight:600;
+          }
+          .st-key-study_intro .intro-icon {
+            display:inline-flex; flex-shrink:0; align-items:center; justify-content:center;
+            width:38px; height:38px; border-radius:12px;
+          }
+          .st-key-study_intro .intro-like {background:#fff0f5;color:#ce2861;}
+          .st-key-study_intro .intro-comment {background:#edf5ff;color:#2866b1;}
+          .st-key-study_intro .intro-dislike {background:#f4efff;color:#7654b5;}
+          .st-key-study_intro .intro-next {
+            display:flex; align-items:flex-start; gap:12px; margin:0 0 18px;
+            padding:16px; background:#f8f8fc; border-radius:14px;
+          }
+          .st-key-study_intro .intro-next svg {flex-shrink:0;color:#77718e;margin-top:3px;}
+          .st-key-study_intro .intro-next p {margin:0;font-size:.94rem;color:#525261;}
+          .st-key-study_intro .intro-topline {
+            display:flex; align-items:center; justify-content:space-between;
+            gap:12px; margin-bottom:24px;
           }
           .st-key-study_intro .intro-brand {
-            color: #737373; font-size: .8rem; font-weight: 700;
-            letter-spacing: .16em; text-transform: uppercase;
+            color:#34313c; font-size:1rem; font-weight:750; letter-spacing:-.03em;
           }
-          .st-key-study_intro .intro-brand span {color: #f24d81;}
-          .st-key-study_intro .intro-subtitle {color: #737373; font-size: 1.1rem;}
+          .st-key-study_intro .intro-brand span {color:#f24d81;}
+          .st-key-study_intro .intro-demo {
+            color:#6c6579; background:#f4f2f8; padding:5px 10px;
+            border-radius:20px; font-size:.72rem;
+          }
+          .st-key-study_intro .intro-subtitle {color:#666272;font-size:1.06rem;margin-bottom:18px;}
           .st-key-study_intro button {min-height: 48px; border-radius: 12px;}
           .st-key-study_intro button[kind="primary"]:not(:disabled) {
             background:#007bc4; border-color:#007bc4; color:#fff;
@@ -129,60 +150,79 @@ if not st.session_state.get("intro_consent_accepted", False):
             background:#f0f2f5; border-color:#e4e6ec;
           }
           .st-key-study_intro button[kind="primary"]:disabled p {color:#666b77;}
-          .st-key-study_intro [data-testid="stCheckbox"] {margin: 20px 0 12px;}
+          .st-key-study_intro [data-testid="stCheckbox"] {margin: 12px 0 14px;}
           @media (max-width: 640px) {
             .st-key-study_intro {
-              margin: 16px auto; padding: 24px 20px; width: calc(100% - 24px);
+              margin: 12px auto; padding: 24px 18px; width: calc(100% - 24px);
               border-radius: 18px;
             }
+            .st-key-study_intro .intro-action {flex-direction:column;gap:7px;padding:12px 4px;font-size:.82rem;}
+            .st-key-study_intro .intro-topline {margin-bottom:20px;}
+            .st-key-study_intro .intro-actions {gap:8px;}
           }
         </style>
         """,
         unsafe_allow_html=True,
     )
     with st.container(key="study_intro"):
-        st.markdown('<div class="intro-brand">InstaLab<span> ●</span></div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="intro-topline"><div class="intro-brand">InstaLab<span> ●</span></div>'
+            '<span class="intro-demo">Versione dimostrativa</span></div>', unsafe_allow_html=True,
+        )
         st.title("Faces in the Digital Age")
         st.markdown(
-            '<p class="intro-subtitle">Uno studio sulla percezione dei volti</p>',
+            '<p class="intro-subtitle">Scorri il feed, proprio come sui social.</p>',
             unsafe_allow_html=True,
         )
         st.write(
-            "Immagina di aprire Instagram: davanti a te trovi un feed di post "
-            "con fotografie di volti di persone. Scorri le immagini e interagisci "
-            "come faresti normalmente sui social. Puoi mettere like ai post che "
-            "ti piacciono, lasciare un commento oppure esprimere un dislike."
+            "Immagina di aprire il tuo social preferito. Troverai un feed di post "
+            "con fotografie di volti: guardali al tuo ritmo e scorri fino alla fine."
+        )
+        st.write(
+            "Se ti va, interagisci come faresti di solito: metti Like, lascia un "
+            "commento o esprimi un Dislike. Puoi anche passare al post successivo "
+            "senza reagire."
         )
         st.markdown(
-            '<div class="intro-actions"><span>♡ Metti like</span>'
-            '<span>Lascia un commento</span><span>Esprimi un dislike</span></div>',
+            '<div class="intro-actions" role="list" aria-label="Interazioni disponibili nel feed">'
+            '<div class="intro-action" role="listitem"><span class="intro-icon intro-like">'
+            '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            '<path d="M20.8 4.6a5.4 5.4 0 0 0-7.7 0L12 5.7l-1.1-1.1a5.4 5.4 0 0 0-7.7 7.7L12 21l8.8-8.7a5.4 5.4 0 0 0 0-7.7z"/></svg>'
+            '</span><span>Like</span></div>'
+            '<div class="intro-action" role="listitem"><span class="intro-icon intro-comment">'
+            '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            '<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9.4 9.4 0 0 1-4-.9L3 21l1.9-5.5A8.5 8.5 0 1 1 21 11.5z"/>'
+            '<path d="M8 10h8M8 14h5"/></svg></span><span>Commenta</span></div>'
+            '<div class="intro-action" role="listitem"><span class="intro-icon intro-dislike">'
+            '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            '<path d="M17 3h4v11h-4zM17 13l-5 8h-1a2 2 0 0 1-2-2l1-5H5a2 2 0 0 1-2-2l1-7a2 2 0 0 1 2-2h11z"/>'
+            '</svg></span><span>Dislike</span></div></div>',
             unsafe_allow_html=True,
         )
-        st.subheader("La tua partecipazione")
-        st.write(
-            "Sei tu a scegliere se partecipare. Puoi decidere di non iniziare "
-            "o fermarti in qualsiasi momento, semplicemente chiudendo la pagina. "
-            "Prima di continuare, leggi le informazioni sullo studio e indica "
-            "il tuo consenso."
+        st.markdown(
+            '<div class="intro-next"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            '<path d="M4 12h16m-6-6 6 6-6 6"/></svg>'
+            '<p>Alla fine del feed, premi <strong>Continua</strong>. Seguirà una '
+            '<strong>seconda fase</strong>: riceverai le istruzioni prima di iniziarla.</p></div>',
+            unsafe_allow_html=True,
         )
         st.caption(
-            "Versione dimostrativa · Le informazioni sullo studio devono essere "
-            "completate prima della raccolta dati."
+            "La partecipazione è volontaria. Puoi interrompere in qualsiasi "
+            "momento chiudendo la pagina."
         )
-        with st.expander("Informazioni sullo studio — da completare"):
+        with st.expander("Consenso informato", expanded=False):
+            st.caption("Versione dimostrativa: le informazioni seguenti devono essere completate prima della raccolta dati.")
             st.markdown(
                 "- [DA COMPLETARE: gruppo di ricerca, istituzione e contatti]\n"
-                "- [DA COMPLETARE: requisiti di partecipazione e durata prevista]\n"
-                "- [DA COMPLETARE: possibili rischi, disagi e benefici]\n"
-                "- [DA COMPLETARE: compenso e conseguenze dell'interruzione]\n"
+                "- [DA COMPLETARE: requisiti, durata, rischi/disagi e benefici, "
+                "compenso e conseguenze dell'interruzione]\n"
                 "- [DA COMPLETARE: dati raccolti, identificativi Prolific, privacy, "
-                "conservazione e accesso ai dati]\n"
-                "- [DA COMPLETARE: ritiro dei dati e relativi limiti]\n"
+                "conservazione, accesso e ritiro dei dati con relativi limiti]\n"
                 "- [DA COMPLETARE: eventuale revisione etica e contatti per diritti e reclami]"
             )
         accepted = st.checkbox(
-            "Ho letto le informazioni sopra riportate e acconsento volontariamente "
-            "a partecipare a questa dimostrazione preliminare.",
+            "Ho letto le informazioni sullo studio e acconsento a partecipare "
+            "a questa dimostrazione.",
             key="intro_consent_checkbox",
         )
         if st.button(
