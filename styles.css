@@ -50,6 +50,9 @@ svg {display:block;flex:none;}
 .options{margin-left:auto;}
 .photo-wrap{height:auto;aspect-ratio:1/1;width:100%;position:relative;background:#f1f1f1;overflow:hidden;border:1px solid #efefef;border-radius:3px;user-select:none;}
 .post-photo{width:100%;height:100%;display:block;object-fit:cover;}
+.image-load-status {position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;text-align:center;font-size:14px;line-height:1.5;color:#4f5865;background:#f1f1f1;}
+.image-load-status[hidden],.image-load-status button[hidden] {display:none!important;}
+.image-load-status button {padding:10px 16px;border:1px solid #c7d0dc;border-radius:10px;background:#fff;color:#0068a8;}
 .photo-placeholder{height:100%;width:100%;display:grid;place-items:center;color:#777;background:linear-gradient(135deg,#f2d9d2,#e5deef,#cddde7);font-size:15px;text-align:center;padding:20px;}
 .burst-heart{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);opacity:0;color:#fff;filter:drop-shadow(0 4px 16px #0005);pointer-events:none;}
 .burst-heart.animate{animation:heartburst .65s ease-in-out;}

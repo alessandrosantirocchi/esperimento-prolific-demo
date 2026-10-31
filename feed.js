@@ -80,6 +80,7 @@ export default function (component) {
     : `<span class="avatar-fallback ${extra}">${ico('profile',false,20)}</span>`;
   const navItem = (tab, iconName, label, hideOnCompact=false) =>
     `<button class="nav-entry ${s.tab===tab?'selected':''} ${hideOnCompact?'compact-hide':''}" data-action="nav" data-tab="${tab}" aria-label="${escape(label)}">${ico(iconName, s.tab===tab)}<span>${escape(label)}</span></button>`;
+  const imageStatus = id => `<div class="image-load-status" role="status"><span>Caricamento immagine…</span><button data-action="retry_image" data-post="${escape(id)}" hidden>Riprova caricamento</button></div>`;
 
   const storyList = () => `<div class="stories" aria-label="Storie">
     ${stories.map((a,i)=>`<button class="story" data-action="story" data-index="${i}" title="Apri storia di ${escape(a.username)}">
@@ -102,13 +103,14 @@ export default function (component) {
          <button class="icon-button options" data-action="post_more" data-post="${escape(p.id)}" aria-label="Opzioni">${ico('more')}</button>
        </header>
        <div class="photo-wrap" data-doublepost="${escape(p.id)}">
-          ${p.image_url?`<img class="post-photo" style="${imageStyle}" loading="lazy" src="${escape(p.image_url)}" alt="Foto del post di ${escape(p.username)}" />`:'<div class="photo-placeholder">Carica uno stimolo in posts.json</div>'}
+          ${p.image_url?`<img class="post-photo" style="${imageStyle}" loading="eager" decoding="async" src="${escape(p.image_url)}" alt="Foto del post di ${escape(p.username)}" />`:'<div class="photo-placeholder">Immagine non disponibile</div>'}
+          ${imageStatus(p.id)}
           <div class="burst-heart">${ico('heart',true,105)}</div>
        </div>
        <div class="post-actions">
          <div class="post-actions-left">
-           <button class="icon-button ${isLiked?'liked':''}" data-action="like" data-post="${escape(p.id)}" aria-label="${isLiked?'Rimuovi mi piace':'Mi piace'}" aria-pressed="${isLiked}">${ico('heart',isLiked,28)}</button>
-           <button class="icon-button" data-action="dislike" data-post="${escape(p.id)}" aria-label="${s.disliked.has(p.id)?'Rimuovi dislike':'Dislike'}" aria-pressed="${s.disliked.has(p.id)}"><span aria-hidden="true">👎</span></button>
+           <button class="icon-button ${isLiked?'liked':''}" data-action="like" data-post="${escape(p.id)}" aria-label="${isLiked?'Rimuovi mi piace':'Mi piace'}" aria-pressed="${isLiked}" disabled>${ico('heart',isLiked,28)}</button>
+           <button class="icon-button" data-action="dislike" data-post="${escape(p.id)}" aria-label="${s.disliked.has(p.id)?'Rimuovi dislike':'Dislike'}" aria-pressed="${s.disliked.has(p.id)}" disabled><span aria-hidden="true">👎</span></button>
            <button class="icon-button" data-action="open_comments" data-post="${escape(p.id)}" aria-label="Commenta">${ico('comment',false,27)}</button>
          </div>
          <button class="icon-button ${isSaved?'saved':''}" data-action="save" data-post="${escape(p.id)}" aria-label="${isSaved?'Rimuovi dai salvati':'Salva'}" aria-pressed="${isSaved}">${ico('bookmark',isSaved,27)}</button>
@@ -128,7 +130,7 @@ export default function (component) {
     return `<div class="feed-area recognition-area"><main class="timeline">
       <header class="recognition-heading"><span>Memoria di riconoscimento</span><h1>Hai già visto questo volto?</h1><p>Volto ${data.trial_number} di ${data.trial_total}</p></header>
       <article class="post recognition-post" data-post="${escape(p.id)}">
-        <div class="photo-wrap"><img class="post-photo recognition-photo" style="${style}" src="${escape(p.image_url)}" alt="Volto da riconoscere" /></div>
+        <div class="photo-wrap"><img class="post-photo recognition-photo" style="${style}" decoding="async" fetchpriority="high" src="${escape(p.image_url)}" alt="Volto da riconoscere" />${imageStatus(p.id)}</div>
         <div class="recognition-actions">${['OLD','NEW'].map(choice=>`<button data-action="recognition_response" data-post="${escape(p.id)}" data-choice="${choice}" aria-pressed="${s.choice===choice}" disabled><strong>${choice}</strong><span>${choice==='OLD'?'Già visto':'Nuovo'}</span></button>`).join('')}</div>
         <p class="recognition-status" aria-live="polite">${s.choice?'Risposta selezionata. Salvataggio in corso…':'Scegli OLD se hai visto il volto nel feed precedente, NEW se è nuovo.'}</p>
       </article></main></div>`;
@@ -157,33 +159,88 @@ export default function (component) {
        <button class="cancel" data-action="close">Annulla</button></div></div>`;
   };
 
+  const wireImages = () => {
+    root.querySelectorAll('.post-photo').forEach(image=>{
+      const card=image.closest('.post');
+      const wrapper=image.closest('.photo-wrap');
+      const status=wrapper.querySelector('.image-load-status');
+      const controls=card.querySelectorAll('[data-action="like"],[data-action="dislike"],[data-action="recognition_response"]');
+      const failed=()=>{
+        if(!root.contains(image))return;
+        image.dataset.decoded='';
+        status.hidden=false;
+        status.querySelector('span').textContent='Immagine non caricata. Riprova prima di proseguire.';
+        status.querySelector('button').hidden=false;
+        controls.forEach(button=>{button.disabled=true;});
+        if(recognition)s.shownAt=null;
+      };
+      const decoded=()=>{
+        if(!root.contains(image) || !image.naturalWidth)return;
+        image.dataset.decoded='true';
+        status.hidden=true;
+        controls.forEach(button=>{button.disabled=recognition && (!!s.choice || s.shownAt===null);});
+        if(observer){observer.unobserve(wrapper);observer.observe(wrapper);}
+        if(recognition)window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{
+          if(!root.contains(image))return;
+          if(s.shownAt===null){s.shownAt=performance.now();s.shownAtClient=new Date().toISOString();}
+          controls.forEach(button=>{button.disabled=!!s.choice;});
+        }));
+      };
+      const loaded=()=>{
+        if(image.dataset.decoded==='true'){decoded();return;}
+        image.__decodePromise ||= image.decode ? image.decode() : Promise.resolve();
+        image.__decodePromise.then(decoded).catch(failed);
+      };
+      image.onload=loaded;
+      image.onerror=failed;
+      if(image.complete){if(image.naturalWidth)loaded();else failed();}
+    });
+  };
+
   const render = () => {
     const y=s.resetScroll?0:window.scrollY;
     s.resetScroll=false;
     const body = recognition ? recognitionCard(posts[0]) : s.tab==='home'?home():s.tab==='explore'?explore():s.tab==='saved'?explore(true):s.tab==='search'?search():s.tab==='profile'?profile():misc(s.tab);
-    root.innerHTML = `<div class="instalab-shell"><div class="page-content">${body}</div>${modal()}</div>`;
+    // Retain decoded <img> nodes through both local and server-driven rerenders.
+    const previousImages=new Map();
+    root.querySelectorAll('.post-photo').forEach(image=>{
+      const id=image.closest('.post')?.dataset.post;
+      if(!previousImages.has(id))previousImages.set(id,[]);
+      previousImages.get(id).push(image);
+    });
+    const template=document.createElement('template');
+    template.innerHTML=`<div class="instalab-shell"><div class="page-content">${body}</div>${modal()}</div>`;
+    template.content.querySelectorAll('.post-photo').forEach(image=>{
+      const candidates=previousImages.get(image.closest('.post')?.dataset.post) || [];
+      const index=candidates.findIndex(previous=>previous.getAttribute('src')===image.getAttribute('src') && previous.getAttribute('style')===image.getAttribute('style') && previous.className===image.className);
+      if(index>=0)image.replaceWith(candidates.splice(index,1)[0]);
+    });
+    root.replaceChildren(template.content);
     window.requestAnimationFrame(()=>window.scrollTo({top:y,behavior:'instant'}));
     // Like/comment/modal renders replace the photo nodes: observe the new nodes.
     if(observer) {
       observer.disconnect();
       if(s.tab==='home' && !s.overlay) root.querySelectorAll('.post .photo-wrap').forEach(el=>observer.observe(el));
     }
-    if (recognition) {
-      const image = root.querySelector('.recognition-photo');
-      const ready = () => window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{
-        if (!root.isConnected || !image.isConnected || !image.naturalWidth) return;
-        if (s.shownAt === null) {s.shownAt = performance.now(); s.shownAtClient = new Date().toISOString();}
-        root.querySelectorAll('[data-action="recognition_response"]').forEach(button=>{button.disabled=!!s.choice;});
-      }));
-      image.onload=ready;
-      image.onerror=()=>{root.querySelector('.recognition-status').textContent='Immagine non disponibile. Non rispondere e contatta il ricercatore.';};
-      if(image.complete && image.naturalWidth) ready();
-    }
+    wireImages();
   };
 
   const perform = (btn) => {
     const action=btn.dataset.action;
     const id=btn.dataset.post||null;
+    if(btn.disabled)return;
+    if(action==='retry_image') {
+      const image=btn.closest('.photo-wrap').querySelector('.post-photo');
+      const source=postBy(id)?.image_url;
+      if(image && source){
+        image.dataset.decoded='';image.__decodePromise=null;
+        const status=image.closest('.photo-wrap').querySelector('.image-load-status');
+        status.querySelector('span').textContent='Caricamento immagine…';btn.hidden=true;
+        image.removeAttribute('src');image.src=source;
+        wireImages();
+      }
+      return;
+    }
     if (recognition) {
       if(action!=='recognition_response' || s.choice || s.shownAt===null || btn.disabled) return;
       s.choice=btn.dataset.choice;
@@ -251,6 +308,7 @@ export default function (component) {
   root.ondblclick = (e) => {
     if(recognition)return;
     const p=e.target.closest('[data-doublepost]');if(!p)return;
+    if(p.querySelector('.post-photo')?.dataset.decoded!=='true')return;
     const id=p.dataset.doublepost;
     if(s.disliked.delete(id))signal('remove_dislike',id);
     if(!s.liked.has(id)){s.liked.add(id);signal('like',id,{method:'double_click'});}
@@ -269,7 +327,7 @@ export default function (component) {
         const requiredWidth=0.6*Math.min(entry.boundingClientRect.width,entry.rootBounds?.width || window.innerWidth);
         if(id && entry.isIntersecting && entry.intersectionRect.height>=requiredHeight && entry.intersectionRect.width>=requiredWidth && !s.seen.has(id)){
           const image=entry.target.querySelector('.post-photo');
-          if(image && (!image.complete || !image.naturalWidth)) {
+          if(image && (!image.complete || !image.naturalWidth || image.dataset.decoded!=='true')) {
             image.addEventListener('load',()=>{if(observer && root.contains(entry.target)){observer.unobserve(entry.target);observer.observe(entry.target);}},{once:true});
             continue;
           }
@@ -279,5 +337,13 @@ export default function (component) {
     },{threshold:Array.from({length:101},(_,i)=>i/100)});
   }
   render();
+  const preloads=root.__imagePreloads ||= new Map();
+  for(const source of data?.preload_images || []){
+    if(!source || preloads.has(source))continue;
+    const image=new Image();image.decoding='async';image.src=source;
+    if(image.decode)image.decode().catch(()=>{});
+    preloads.set(source,image);
+    if(preloads.size>4)preloads.delete(preloads.keys().next().value);
+  }
   return () => { if(observer)observer.disconnect(); root.onclick=null;root.onsubmit=null;root.oninput=null;root.ondblclick=null; };
 }

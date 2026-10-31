@@ -15,7 +15,8 @@
       "minutes_ago": 30,
       "initial_likes": 0,
       "caption": "",
-      "comments": []
+      "comments": [],
+      "image_position": "center top"
     },
     {
       "id": "P002",
@@ -29,7 +30,8 @@
       "minutes_ago": 30,
       "initial_likes": 0,
       "caption": "",
-      "comments": []
+      "comments": [],
+      "image_position": "center top"
     },
     {
       "id": "P003",
@@ -43,7 +45,8 @@
       "minutes_ago": 30,
       "initial_likes": 0,
       "caption": "",
-      "comments": []
+      "comments": [],
+      "image_position": "center top"
     },
     {
       "id": "P004",
@@ -142,7 +145,8 @@
       "minutes_ago": 30,
       "initial_likes": 0,
       "caption": "",
-      "comments": []
+      "comments": [],
+      "image_position": "center top"
     },
     {
       "id": "P011",
@@ -384,7 +388,8 @@
       "avatar": "",
       "username": "",
       "caption": "",
-      "comments": []
+      "comments": [],
+      "image_position": "center top"
     },
     {
       "id": "N004",
@@ -394,7 +399,8 @@
       "avatar": "",
       "username": "",
       "caption": "",
-      "comments": []
+      "comments": [],
+      "image_position": "center top"
     },
     {
       "id": "N005",

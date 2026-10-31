@@ -107,7 +107,7 @@ Da **Inizia il riconoscimento** si passa a 20 prove, una fotografia per volta, c
 - **OLD — Già visto**: volto presente nel feed precedente.
 - **NEW — Nuovo**: volto non presente nel feed precedente.
 
-Per sessione vengono estratti casualmente 10 OLD dai 20 volti della prima fase (5 reali e 5 sintetici), mescolati con 10 NEW (5 reali e 5 sintetici) definiti in `recognition_new_posts` in `posts.json`. I NEW non vengono mostrati nella prima fase. Le regioni sintetiche condividono il foglio sorgente, i cui byte completi sono disponibili al browser: questa demo non è progettata per impedire l’ispezione degli asset. Il piano viene fissato e salvato all'avvio della sessione. Gli ID delle prove visualizzati nel browser non indicano OLD/NEW e non si riutilizzano nomi, commenti o conteggi del feed come indizi di riconoscimento.
+Per sessione vengono estratti casualmente 10 OLD dai 20 volti della prima fase (5 reali e 5 sintetici), mescolati con 10 NEW (5 reali e 5 sintetici) definiti in `recognition_new_posts` in `posts.json`. I NEW non vengono mostrati né precaricati nella prima fase. Il piano viene fissato e salvato all'avvio della sessione. Gli ID delle prove visualizzati nel browser non indicano OLD/NEW e non si riutilizzano nomi, commenti o conteggi del feed come indizi di riconoscimento.
 
 Ogni prova accetta una sola scelta. La prova successiva compare dopo il salvataggio; non viene mostrato un feedback di correttezza. Le risposte e l'evento di completamento usano lo stesso database e la stessa sessione/PID della prima fase. La confidenza non è implementata.
 
@@ -118,3 +118,15 @@ Negli export CSV sono presenti `phase`, `trial_id`, `response`, `target`, `corre
 ## Controlli di sviluppo
 
 Eseguire `python -m unittest discover -s tests`. Con Playwright e Chromium disponibili, `python tests/browser_continue.py` verifica il tracciamento su finestre basse, dopo like/commenti, il recupero dei volti mancanti e il segnale di Continua. `CHROMIUM_PATH` può indicare un eseguibile Chromium diverso.
+
+## Caricamento delle immagini
+
+Gli originali rimangono invariati. `image_assets.py` genera in memoria versioni WebP di visualizzazione (qualità 92, lato massimo 960 px, orientamento EXIF rispettato), con cache limitata e invalidata quando il file cambia. I riquadri sintetici vengono ritagliati dal foglio sorgente sul server: il browser riceve singoli volti, senza dover ridimensionare e mascherare un foglio da 3664×1951 pixel in ogni post. Si applica lo stesso percorso di preparazione ai volti reali e sintetici; OLD e prima fase usano la stessa derivata. La compressione e le dimensioni di questa demo vanno validate per l'uso sperimentale.
+
+Nel campione corrente le immagini del feed passano da circa 6,7 MB di sorgenti uniche a 1,4 MB di derivate (prima della codifica base64). Il tempo effettivo dipende da connessione e dispositivo; la prima preparazione sul server richiede più tempo di quelle successive già in cache.
+
+Il feed avvia il caricamento di tutti i 20 volti; il riconoscimento precarica solo i due volti successivi della seconda fase. Gli aggiornamenti del feed mantengono gli elementi immagine già decodificati. Un errore mostra **Riprova caricamento** e blocca le reazioni finché l'immagine non è disponibile. Le visualizzazioni e il tempo di risposta al riconoscimento iniziano solo dopo la decodifica.
+
+`image_position` in `posts.json` corregge l'inquadratura nel riquadro quadrato: per alcune fotografie verticali è impostato `center top`, così il volto non viene tagliato dal centraggio sul busto. La stessa impostazione vale per l'eventuale ripresentazione OLD.
+
+Con Playwright e Pillow nello stesso runtime, `python tests/browser_images.py` controlla tutti i volti, scorrimenti ripetuti, conservazione degli elementi immagine attraverso aggiornamenti, e recupero da un errore di decodifica simulato. L'anteprima HTML include le stesse immagini ottimizzate; il salvataggio degli eventi resta disponibile solo tramite Streamlit.

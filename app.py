@@ -6,7 +6,6 @@ and example posts/stimuli in posts.json. Events are also committed to local SQLi
 
 from __future__ import annotations
 
-import base64
 import csv
 import io
 import json
@@ -20,6 +19,7 @@ from pathlib import Path
 import streamlit as st
 from event_store import save_events
 from recognition import make_plan, score_response
+from image_assets import prepare_image
 
 BASE = Path(__file__).resolve().parent
 st.set_page_config(
@@ -50,29 +50,28 @@ st.markdown(
 )
 
 
-def local_image_data(filename: str) -> str:
+def local_image_data(filename: str, region: dict | None = None) -> str:
     """Serve local images from the repository root or its stimuli directory."""
     candidate = (BASE / str(filename)).resolve()
     if candidate.parent not in {BASE, BASE / "stimuli"} or candidate.suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"}:
         return ""
     if not candidate.is_file():
         return ""
-    mime = {
-        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-        ".png": "image/png", ".webp": "image/webp",
-    }[candidate.suffix.lower()]
-    return f"data:{mime};base64,{base64.b64encode(candidate.read_bytes()).decode('ascii')}"
+    return prepare_image(candidate, region).url
 
 
 def load_stimuli() -> dict:
     raw = json.loads((BASE / "posts.json").read_text(encoding="utf-8"))
     images = {}
-    def image_data(filename):
-        if filename not in images:
-            images[filename] = local_image_data(filename)
-        return images[filename]
+    def image_data(filename, region=None):
+        key = (filename, json.dumps(region, sort_keys=True))
+        if key not in images:
+            images[key] = local_image_data(filename, region)
+        return images[key]
     for post in raw.get("posts", []) + raw.get("recognition_new_posts", []):
-        post["image_url"] = image_data(post.get("image", ""))
+        post["image_url"] = image_data(post.get("image", ""), post.get("image_region"))
+        if not post["image_url"]:
+            raise ValueError("A required stimulus image is missing")
         post["avatar_url"] = image_data(post.get("avatar", post.get("image", "")))
     for story in raw.get("stories", []):
         story["image_url"] = local_image_data(story.get("image", ""))
@@ -222,7 +221,11 @@ if not st.session_state.get("intro_consent_accepted", False):
             st.rerun()
     st.stop()
 
-study = load_stimuli()
+try:
+    study = load_stimuli()
+except (OSError, ValueError, KeyError):
+    st.error("Non è stato possibile caricare le fotografie. Ricarica la pagina; se il problema persiste, contatta il ricercatore.")
+    st.stop()
 css, js = load_frontend()
 
 posts_by_id = {post["id"]: post for post in study.get("posts", [])}
@@ -299,6 +302,12 @@ for post in visible_posts:
         image_sources[image_keys[image_url]] = image_url
     component_posts.append({**{k: v for k, v in post.items() if k != "image_url"},
                             "image_key": image_keys[image_url]})
+    # Cropping has already been applied to the cached display asset.
+    component_posts[-1].pop("image_region", None)
+
+preload_images = []
+if phase == "recognition":
+    preload_images = [all_posts_by_id[t["post_id"]]["image_url"] for t in remaining_trials[1:3]]
 
 feed_component = st.components.v2.component(
     "instalab_social_feed",
@@ -313,6 +322,7 @@ response = feed_component(
     data={
         "posts": component_posts,
         "image_sources": image_sources,
+        "preload_images": preload_images,
         "stories": study.get("stories", []) if phase == "feed" else [],
         "phase": phase,
         "phase1_ready": phase1_ready,
