@@ -10,21 +10,24 @@ from playwright.sync_api import expect, sync_playwright
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 from image_assets import prepare_image
+from stimulus_catalog import load_catalog, select_sets, display_post
+import random
 
 
 def run():
-    study = json.loads((BASE / "posts.json").read_text())
+    catalog = load_catalog(BASE)
+    selection = select_sets(catalog, random.Random(42))
     posts = []
     images = {}
-    for index, original in enumerate(study["posts"]):
-        post = {k: v for k, v in original.items() if k != "image_region"}
+    for index, original in enumerate(p for p in catalog.records if p["id"] in selection["feed"]):
+        post = {**display_post(original), "username":f"profilo.{index:02}","comments":[]}
         post["image_key"] = f"asset-{index}"
         images[post["image_key"]] = prepare_image(BASE / original["image"], original.get("image_region")).url
         posts.append(post)
     data = {"posts": posts, "image_sources": images, "phase": "feed", "history": [],
             "phase1_ready": False, "missing_post_ids": [p["id"] for p in posts]}
     css = (BASE / "styles.css").read_text().replace(":host {", "body {", 1)
-    js = (BASE / "feed.js").read_text().replace("export default function (component)", "function initFeed(component)", 1)
+    js = (BASE / "feed_tracking.js").read_text() + "\n" + (BASE / "feed.js").read_text().replace("export default function (component)", "function initFeed(component)", 1)
     html = ('<style>html,body{margin:0}' + css + '</style><div id="instalab-root"></div><script>' + js +
             '\nwindow.events=[];window.hostData=' + json.dumps(data) + ';' +
             'window.mount=()=>{window.cleanup?.();window.cleanup=initFeed({parentElement:document,data:window.hostData,' +
@@ -36,17 +39,17 @@ def run():
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.set_content(html)
-            page.wait_for_function('document.querySelectorAll(".post-photo").length===20 && [...document.querySelectorAll(".post-photo")].every(i=>i.dataset.decoded==="true" && i.naturalWidth>0)')
+            page.wait_for_function('(count)=>document.querySelectorAll(".post-photo").length===count && [...document.querySelectorAll(".post-photo")].every(i=>i.dataset.decoded==="true" && i.naturalWidth>0)', arg=len(posts))
             page.evaluate('window.originalImages=[...document.querySelectorAll(".post-photo")]')
             for _ in range(2):
-                for index in range(20):
+                for index in range(len(posts)):
                     page.locator('.post-photo').nth(index).evaluate('(image)=>image.scrollIntoView({block:"center"})')
                     page.wait_for_timeout(16)
             page.locator('[data-action="like"]').first.click()
             form = page.locator('form[data-comment-post]').first
             form.locator('input').fill('Verifica caricamento')
             form.locator('button').click()
-            page.evaluate('window.mount();window.mount()')
+            page.evaluate('window.hostData.image_sources={};window.mount();window.mount()')
             assert page.evaluate('window.originalImages.every((image,index)=>image===document.querySelectorAll(".post-photo")[index] && image.dataset.decoded==="true")')
             assert page.locator('.image-load-status:not([hidden])').count() == 0
             # A broken decode cannot accept a rating, and retry restores the same face.
@@ -58,7 +61,7 @@ def run():
             expect(page.locator('[data-action="like"]').first).to_be_enabled()
             assert page.locator('.post-photo').first.get_attribute('src') == images['asset-0']
             assert not errors, errors
-            print(f'{width}x{height}: 20 decoded faces, fast scrolling, stable image nodes through reactions/reruns, retry PASS', flush=True)
+            print(f'{width}x{height}: {len(posts)} decoded faces, fast scrolling, stable image nodes through reactions/reruns, retry PASS', flush=True)
             page.close()
         browser.close()
 

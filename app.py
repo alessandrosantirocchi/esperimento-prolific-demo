@@ -1,12 +1,11 @@
 """InstaLab: Instagram-inspired research-feed prototype for Streamlit.
 
 Customize the visual layout in styles.css, interactions in feed.js,
-and example posts/stimuli in posts.json. Events are also committed to local SQLite.
+and the stimulus catalog in stimuli.csv and images/. Events are stored in SQLite.
 """
 
 from __future__ import annotations
 
-import json
 import math
 import random
 import sqlite3
@@ -20,6 +19,10 @@ from recognition import make_plan, score_response
 from image_assets import prepare_image
 from export_data import csv_bytes as export_csv
 from research_dashboard import render_dashboard
+from experiment_protocol import PROTOCOL_VERSION
+from feed_metrics import TRACKING_VERSION, FEED_METRIC_COLUMNS, feed_metrics_rows, valid_view_details
+from stimulus_catalog import (load_catalog, select_sets, CatalogError, METADATA_FIELDS,
+                              display_post, public_history)
 
 BASE = Path(__file__).resolve().parent
 st.set_page_config(
@@ -54,38 +57,23 @@ st.markdown(
 )
 
 
-def local_image_data(filename: str, region: dict | None = None) -> str:
-    """Serve local images from the repository root or its stimuli directory."""
-    candidate = (BASE / str(filename)).resolve()
-    if candidate.parent not in {BASE, BASE / "stimuli"} or candidate.suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"}:
-        return ""
-    if not candidate.is_file():
-        return ""
-    return prepare_image(candidate, region).url
-
-
-def load_stimuli() -> dict:
-    raw = json.loads((BASE / "posts.json").read_text(encoding="utf-8"))
-    images = {}
-    def image_data(filename, region=None):
-        key = (filename, json.dumps(region, sort_keys=True))
-        if key not in images:
-            images[key] = local_image_data(filename, region)
-        return images[key]
-    for post in raw.get("posts", []) + raw.get("recognition_new_posts", []):
-        post["image_url"] = image_data(post.get("image", ""), post.get("image_region"))
-        if not post["image_url"]:
-            raise ValueError("A required stimulus image is missing")
-        post["avatar_url"] = image_data(post.get("avatar", post.get("image", "")))
-    for story in raw.get("stories", []):
-        story["image_url"] = local_image_data(story.get("image", ""))
-    return raw
+def load_stimuli(catalog, selection) -> dict:
+    by_id = {record["id"]: record for record in catalog.records}
+    study = {"posts": [], "recognition_new_posts": [], "stories": [], "display_name": "InstaLab"}
+    for key, destination in (("feed", "posts"), ("new", "recognition_new_posts")):
+        for index, identifier in enumerate(selection[key], 1):
+            record = by_id[identifier]
+            study[destination].append({**record, "image_url": prepare_image(catalog.base / record["image"]).url,
+                                       "avatar_url": "", "username": f"profilo.{index:02}", "caption": "",
+                                       "comments": [], "location": "", "initial_likes": 0,
+                                       "minutes_ago": 30, "verified": False})
+    return study
 
 
 def load_frontend() -> tuple[str, str]:
     return (
         (BASE / "styles.css").read_text(encoding="utf-8"),
-        (BASE / "feed.js").read_text(encoding="utf-8"),
+        (BASE / "feed_tracking.js").read_text(encoding="utf-8") + "\n" + (BASE / "feed.js").read_text(encoding="utf-8"),
     )
 
 
@@ -210,9 +198,19 @@ if not st.session_state.get("intro_consent_accepted", False):
     st.stop()
 
 try:
-    study = load_stimuli()
-except (OSError, ValueError, KeyError):
-    st.error("Non è stato possibile caricare le fotografie. Ricarica la pagina; se il problema persiste, contatta il ricercatore.")
+    catalog = load_catalog(BASE)
+    if "stimulus_selection" not in st.session_state:
+        if st.session_state.get("recording_initialized", False):
+            st.error("Gli stimoli sono cambiati. Ricarica la pagina per iniziare una nuova sessione.")
+            st.stop()
+        st.session_state.stimulus_selection = select_sets(catalog)
+    if (st.session_state.stimulus_selection.get("protocol_version") != PROTOCOL_VERSION
+            or st.session_state.stimulus_selection["fingerprint"] != catalog.fingerprint):
+        st.error("La configurazione dello studio è cambiata. Ricarica la pagina per iniziare una nuova sessione.")
+        st.stop()
+    study = load_stimuli(catalog, st.session_state.stimulus_selection)
+except (CatalogError, OSError, ValueError, KeyError):
+    st.error("Non è stato possibile preparare le fotografie. Il ricercatore deve verificare la configurazione degli stimoli.")
     st.stop()
 css, js = load_frontend()
 
@@ -283,6 +281,8 @@ if phase == "recognition" and not remaining_trials:
         if str(st.query_params.get("preview", "0")) == "1":
             st.download_button("Scarica interazioni CSV", export_csv(st.session_state.feed_events),
                                "instalab_interazioni.csv", "text/csv")
+            st.download_button("Metriche del feed (CSV)", export_csv(feed_metrics_rows(st.session_state.feed_events), FEED_METRIC_COLUMNS),
+                               "feed_metrics.csv", "text/csv")
     st.stop()
 
 seen_posts = {e.get("post_id") for e in st.session_state.feed_events if e.get("event_type") == "post_impression" and e.get("phase", "feed") == "feed"}
@@ -294,7 +294,7 @@ if phase == "recognition":
     visible_posts = [{k: p[k] for k in ("id", "image_url", "image_region", "image_position") if k in p} for p in visible_posts]
     visible_posts[0]["id"] = remaining_trials[0]["trial_id"]
 
-# Send shared source sheets once, rather than once per tile on every event.
+# Send each display asset once in the component payload.
 image_sources = {}
 image_keys = {}
 component_posts = []
@@ -303,7 +303,7 @@ for post in visible_posts:
     if image_url not in image_keys:
         image_keys[image_url] = f"asset-{len(image_keys)}"
         image_sources[image_keys[image_url]] = image_url
-    component_posts.append({**{k: v for k, v in post.items() if k != "image_url"},
+    component_posts.append({**{k: v for k, v in display_post(post).items() if k != "image_url"},
                             "image_key": image_keys[image_url]})
     # Cropping has already been applied to the cached display asset.
     component_posts[-1].pop("image_region", None)
@@ -311,6 +311,11 @@ for post in visible_posts:
 preload_images = []
 if phase == "recognition":
     preload_images = [all_posts_by_id[t["post_id"]]["image_url"] for t in remaining_trials[1:3]]
+
+# The feed tracker acknowledges the browser's per-session asset cache. Timer
+# checkpoints must not retransmit every face on each Streamlit rerun.
+if phase == "feed" and any(e.get("event_type") == "feed_tracking_started" for e in st.session_state.feed_events):
+    image_sources = {}
 
 feed_component = st.components.v2.component(
     "instalab_social_feed",
@@ -334,9 +339,8 @@ response = feed_component(
         "trial_total": len(st.session_state.recognition_plan),
         "title": study.get("display_name", "InstaLab"),
         "participant_id": participant_id,
-        "history": [{k: v for k, v in e.items() if k != "details"} if e.get("event_type") in {"session_started", "recognition_plan_assigned"} else
-                    {**e, "details": {k: v for k, v in e.get("details", {}).items() if k not in {"target", "correct"}}}
-                    for e in st.session_state.feed_events],
+        "session_id": st.session_state.recording_session_id,
+        "history": public_history(st.session_state.feed_events),
     },
     default={"events": []},
     on_events_change=lambda: None,
@@ -359,6 +363,18 @@ for event in new_events:
     pending_ids.add(event_id)
     event = dict(event)
     event["phase"] = phase
+    if str(event.get("event_type", "")).startswith("feed_"):
+        if phase != "feed":
+            continue
+        details = event.get("details", {})
+        if event.get("event_type") == "feed_view":
+            if event.get("post_id") not in posts_by_id or not valid_view_details(details):
+                continue
+        elif event.get("event_type") in {"feed_tracking_started", "feed_tracking_finalized"}:
+            if not isinstance(details, dict) or details.get("tracking_version") != TRACKING_VERSION:
+                continue
+        else:
+            continue
     if phase == "feed" and event.get("event_type") == "post_impression":
         if event.get("post_id") not in posts_by_id or event["post_id"] in batch_seen_posts:
             continue
@@ -391,8 +407,9 @@ for event in new_events:
     event["session_id"] = st.session_state.recording_session_id
     event["participant_id"] = participant_id
     post = all_posts_by_id.get(event.get("post_id"))
-    event["stimulus_id"] = post.get("stimulus_id", "") if post else ""
-    event["stimulus_type"] = post.get("stimulus_type", "") if post else ""
+    for field in METADATA_FIELDS:
+        event[field] = post.get(field, "") if post else ""
+    event["feed_position"] = st.session_state.feed_post_order.index(event["post_id"]) + 1 if event.get("post_id") in posts_by_id else ""
     event["server_received_ts"] = datetime.now(timezone.utc).isoformat()
     pending_events.append(event)
 
@@ -402,7 +419,9 @@ try:
                                "session_id": st.session_state.recording_session_id,
                                "participant_id": participant_id,
                                "server_received_ts": datetime.now(timezone.utc).isoformat(),
-                               "details": {"recognition_plan": st.session_state.recognition_plan}})
+                               "details": {"recognition_plan": st.session_state.recognition_plan,
+                                           "catalog_fingerprint": catalog.fingerprint,
+                                           "protocol_version": PROTOCOL_VERSION}})
     if phase == "recognition" and len(batch_answered_ids) == len(st.session_state.recognition_plan):
         pending_events.append({"event_id": "recognition_completed", "event_type": "recognition_completed",
                                "session_id": st.session_state.recording_session_id,
@@ -417,7 +436,12 @@ try:
             "server_received_ts": datetime.now(timezone.utc).isoformat(),
             "details": {"consent_accepted_at": st.session_state.intro_consent_accepted_at,
                         "post_order": st.session_state.feed_post_order,
-                        "recognition_plan": st.session_state.recognition_plan},
+                        "recognition_plan": st.session_state.recognition_plan,
+                        "catalog_fingerprint": catalog.fingerprint,
+                        "protocol_version": PROTOCOL_VERSION,
+                        "feed_tracking_version": TRACKING_VERSION,
+                        "stimuli": [{field: p[field] for field in ("id", "image", "sha256") + METADATA_FIELDS}
+                                    for p in study["posts"] + study["recognition_new_posts"]]},
         })
     if pending_events:
         save_events(st.session_state.recording_session_id, pending_events)
@@ -449,3 +473,6 @@ if str(st.query_params.get("preview", "0")) == "1":
             file_name="instalab_interazioni_demo.csv",
             mime="text/csv",
         )
+        metric_rows = feed_metrics_rows(st.session_state.feed_events)
+        st.download_button("Metriche del feed (CSV)", export_csv(metric_rows, FEED_METRIC_COLUMNS),
+                           "feed_metrics.csv", "text/csv", disabled=not metric_rows)
