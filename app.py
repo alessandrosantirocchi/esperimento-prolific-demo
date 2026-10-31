@@ -77,7 +77,13 @@ def load_frontend() -> tuple[str, str]:
     )
 
 
-participant_id = str(st.query_params.get("PROLIFIC_PID", "DEMO_SESSION"))
+if "participant_id" not in st.session_state:
+    # Preserve an already-consented session across a deployment; new visits get
+    # an internal code that does not depend on recruitment URL parameters.
+    previous_id = (st.session_state.get("intro_consent_participant_id")
+                   if st.session_state.get("intro_consent_accepted", False) else None)
+    st.session_state.participant_id = previous_id or f"P_{uuid.uuid4().hex}"
+participant_id = st.session_state.participant_id
 
 if not st.session_state.get("intro_consent_accepted", False):
     st.markdown(
@@ -216,7 +222,7 @@ if not st.session_state.get("intro_consent_accepted", False):
                 "- [DA COMPLETARE: gruppo di ricerca, istituzione e contatti]\n"
                 "- [DA COMPLETARE: requisiti, durata, rischi/disagi e benefici, "
                 "compenso e conseguenze dell'interruzione]\n"
-                "- [DA COMPLETARE: dati raccolti, identificativi Prolific, privacy, "
+                "- [DA COMPLETARE: dati raccolti, codici di partecipazione e sessione, privacy, "
                 "conservazione, accesso e ritiro dei dati con relativi limiti]\n"
                 "- [DA COMPLETARE: eventuale revisione etica e contatti per diritti e reclami]"
             )

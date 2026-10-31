@@ -16,7 +16,15 @@ python -m streamlit run app.py
 
 Su Windows usare `python` al posto di `python3` e attivare l'ambiente con `.venv\Scripts\Activate.ps1` in PowerShell.
 
-Aprire l'indirizzo mostrato da Streamlit. Per controllare il mantenimento dell'identificativo Prolific aggiungere `?PROLIFIC_PID=TEST001`. Accettare il consenso, scorrere tutti i volti, premere **Continua**, leggere le istruzioni e avviare il riconoscimento. Per una nuova sessione ricaricare la pagina. Non è implementata la ripresa di una sessione interrotta tramite PID.
+Aprire l'indirizzo mostrato da Streamlit, senza aggiungere identificativi al link. Accettare il consenso, scorrere tutti i volti, premere **Continua**, leggere le istruzioni e avviare il riconoscimento. Per una nuova sessione ricaricare la pagina. Non è implementata la ripresa di una sessione interrotta.
+
+### Raccolta tramite un link pubblico
+
+Per una bacheca universitaria si può condividere il normale indirizzo pubblico dell'app, senza parametri di reclutamento, account o un codice da inserire. Alla prima apertura l'app assegna in sessione un `participant_id` casuale del tipo `P_…`, indipendente dai parametri dell'URL. Il codice resta invariato durante consenso, feed, memoria e normali rerun Streamlit. Un `session_id` distinto identifica la prova e rimane uguale nelle due fasi.
+
+Nei CSV usare `participant_id` e `session_id` per distinguere le partecipazioni; aggiungere `stimulus_id` per unire metriche del feed e risposte di memoria. Non vengono richiesti nome, e-mail o matricola per assegnare il codice. Il codice identifica una partecipazione, non certifica una persona distinta: una nuova scheda o un refresh che avvia una nuova sessione assegna nuovi codici e non permette di rilevare da solo partecipazioni ripetute. Non è implementato un identificatore persistente del browser.
+
+I risultati storici non vengono riscritti. Se durante un aggiornamento è ancora attiva una sessione già consenziente, viene conservato il suo identificativo precedente, evitando di dividere la stessa prova tra codici diversi.
 
 Le prove locali registrano dati nello stesso modo delle altre sessioni. Per tenere un database di prova separato, impostare `INSTALAB_DB_PATH` prima dell'avvio, per esempio su macOS/Linux:
 
@@ -77,7 +85,7 @@ La versione del protocollo viene registrata nei metadati degli eventi di avvio e
 
 Il consenso preliminare è obbligatorio. Le istruzioni di memoria appaiono dopo il feed. **Continua** diventa disponibile quando il server ha registrato tutte le visualizzazioni: fotografia decodificata e almeno il 60% dell'altezza disponibile per l'immagine visibile (il minimo tra altezza della fotografia e del viewport). **Mostra il prossimo volto da visualizzare** permette di recuperare una visualizzazione mancante. Non è obbligatoria una reazione a ogni post.
 
-Il riconoscimento presenta una fotografia per volta e consente una sola risposta OLD/NEW, senza feedback di correttezza. La prova successiva arriva dopo il salvataggio. La confidenza non è implementata. Il PID e la sessione sono gli stessi delle due parti.
+Il riconoscimento presenta una fotografia per volta e consente una sola risposta OLD/NEW, senza feedback di correttezza. La prova successiva arriva dopo il salvataggio. La confidenza non è implementata. Il codice partecipante e la sessione sono gli stessi delle due parti.
 
 ## Metadati ed esportazione
 
@@ -115,7 +123,7 @@ Viene eliminata l'intera sessione, comprese entrambe le fasi. Non esiste un ripr
 
 ## Registrazione e conservazione
 
-Gli eventi vengono salvati in `.local-data/events.sqlite3`, escluso da Git. `INSTALAB_DB_PATH` permette di scegliere un altro percorso sul server. I reinvii dello stesso evento non creano duplicati; sessioni senza PID hanno ID distinti. Un errore di scrittura viene segnalato con la possibilità di riprovare.
+Gli eventi vengono salvati in `.local-data/events.sqlite3`, escluso da Git. `INSTALAB_DB_PATH` permette di scegliere un altro percorso sul server. I reinvii dello stesso evento non creano duplicati; le nuove sessioni hanno codici partecipante e sessione distinti. Un errore di scrittura viene segnalato con la possibilità di riprovare.
 
 Il file SQLite rimane dopo un riavvio solo se il disco resta disponibile. Il disco effimero di Streamlit Community Cloud non garantisce la conservazione dopo ricreazioni o redeploy. Per una raccolta reale occorre configurare storage durevole e backup. Nessuna anonimizzazione, durata di conservazione o approvazione etica viene dichiarata come già configurata. Completare le informazioni nel consenso, le condizioni di utilizzo degli stimoli e la validazione del protocollo prima del reclutamento.
 
@@ -132,6 +140,8 @@ Il file SQLite rimane dopo un riavvio solo se il disco resta disponibile. Il dis
 - `feed_tracking.js`, `feed_metrics.py`: timer della Fase 1, gestione dei checkpoint e aggregazione delle metriche esportate.
 
 Il browser riceve nel feed solo le 30 immagini selezionate e nel riconoscimento la prova attuale con precaricamento delle due successive. I NEW non vengono inviati nella prima fase. Le immagini decodificate vengono mantenute durante gli aggiornamenti. Un errore abilita **Riprova caricamento** e impedisce risposte su un'immagine non caricata.
+
+Se un rerender interrompe la decodifica di un'immagine già caricata correttamente, il browser la ritenta automaticamente senza conservare una promessa rifiutata. I callback aggiornano la scheda corrente; gli errori effettivi continuano a mostrare **Riprova caricamento**.
 
 ```sh
 python -m unittest discover -s tests

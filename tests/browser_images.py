@@ -52,6 +52,17 @@ def run():
             page.evaluate('window.hostData.image_sources={};window.mount();window.mount()')
             assert page.evaluate('window.originalImages.every((image,index)=>image===document.querySelectorAll(".post-photo")[index] && image.dataset.decoded==="true")')
             assert page.locator('.image-load-status:not([hidden])').count() == 0
+            # A rerender may abort an unfinished decode even with valid bytes.
+            # Recover it automatically, using the controls of the current card.
+            page.locator('.post-photo').first.evaluate('''(image)=>{
+              const decode=image.decode.bind(image);
+              image.decode=()=>{image.decode=decode;return Promise.reject(new DOMException("Decode interrupted by rerender","EncodingError"));};
+              image.dataset.decoded="";image.__decodePromise=null;
+            }''')
+            page.evaluate('window.mount();window.mount()')
+            page.wait_for_function('document.querySelector(".post-photo").dataset.decoded==="true"')
+            expect(page.locator('[data-action="like"]').first).to_be_enabled()
+            assert page.locator('.image-load-status:not([hidden])').count() == 0
             # A broken decode cannot accept a rating, and retry restores the same face.
             page.locator('.post-photo').first.evaluate('(image)=>{image.dataset.decoded="";image.__decodePromise=null;image.src="data:image/webp;base64,broken";}')
             expect(page.locator('[data-action="retry_image"]').first).to_be_visible()

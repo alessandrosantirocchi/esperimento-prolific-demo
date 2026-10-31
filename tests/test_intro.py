@@ -6,6 +6,7 @@ import tempfile
 from unittest.mock import patch
 from datetime import datetime
 from pathlib import Path
+import uuid
 
 from streamlit.testing.v1 import AppTest
 from catalog_fixture import create_catalog
@@ -46,15 +47,15 @@ class IntroductionTests(unittest.TestCase):
         self.assertTrue(app.button[0].disabled)
 
     def test_acceptance_preserves_participant_and_survives_rerun(self):
-        app = AppTest.from_file(str(APP))
-        app.query_params["PROLIFIC_PID"] = "TEST001"
-        app.run()
+        app = AppTest.from_file(str(APP)).run()
+        participant = app.session_state["participant_id"]
+        self.assertTrue(participant.startswith("P_"))
+        self.assertEqual(uuid.UUID(hex=participant[2:]).version, 4)
         app.checkbox[0].check().run()
         app.button[0].click().run()
         self.assertFalse(app.exception)
         self.assertTrue(app.session_state["intro_consent_accepted"])
-        self.assertEqual(app.session_state["intro_consent_participant_id"], "TEST001")
-        self.assertEqual(app.query_params["PROLIFIC_PID"], "TEST001")
+        self.assertEqual(app.session_state["intro_consent_participant_id"], participant)
         timestamp = app.session_state["intro_consent_accepted_at"]
         self.assertIsNotNone(datetime.fromisoformat(timestamp).tzinfo)
         self.assertIn("feed_events", app.session_state)
@@ -67,9 +68,43 @@ class IntroductionTests(unittest.TestCase):
         self.assertEqual(len(app.checkbox), 0)
         self.assertEqual(app.session_state["intro_consent_accepted_at"], timestamp)
         self.assertEqual(app.session_state["feed_post_order"], order)
+        self.assertEqual(app.session_state["participant_id"], participant)
+        self.assertEqual({e["participant_id"] for e in app.session_state["feed_events"]}, {participant})
         assignments = [e for e in app.session_state["feed_events"] if e["event_type"] == "recognition_plan_assigned"]
         self.assertEqual(len(assignments), 1)
         self.assertEqual(assignments[0]["details"]["recognition_plan"], app.session_state["recognition_plan"])
+
+    def test_plain_link_sessions_get_distinct_participant_codes_before_consent(self):
+        first = AppTest.from_file(str(APP)).run()
+        second = AppTest.from_file(str(APP)).run()
+        self.assertNotEqual(first.session_state["participant_id"], second.session_state["participant_id"])
+        self.storage.assert_not_called()
+
+    def test_query_parameters_do_not_supply_or_change_the_participant_code(self):
+        app = AppTest.from_file(str(APP))
+        app.query_params["PROLIFIC_PID"] = "OLD_EXTERNAL_ID"
+        app.query_params["participant_id"] = "ANOTHER_EXTERNAL_ID"
+        app.run()
+        participant = app.session_state["participant_id"]
+        self.assertNotIn(participant, {"OLD_EXTERNAL_ID", "ANOTHER_EXTERNAL_ID"})
+        app.query_params["PROLIFIC_PID"] = "CHANGED_EXTERNAL_ID"
+        app.run()
+        self.assertEqual(app.session_state["participant_id"], participant)
+
+    def test_active_legacy_session_retains_its_original_participant_code(self):
+        app = AppTest.from_file(str(APP)).run()
+        app.checkbox[0].check().run()
+        app.button[0].click().run()
+        session = app.session_state["recording_session_id"]
+        del app.session_state["participant_id"]
+        app.session_state["intro_consent_participant_id"] = "LEGACY_PARTICIPANT"
+        app.session_state["feed_events"] = [{**e, "participant_id":"LEGACY_PARTICIPANT"} for e in app.session_state["feed_events"]]
+        calls = self.storage.call_count
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertEqual(app.session_state["participant_id"], "LEGACY_PARTICIPANT")
+        self.assertEqual(app.session_state["recording_session_id"], session)
+        self.assertEqual(self.storage.call_count, calls)
 
     def test_catalog_reserves_distinct_new_faces(self):
         selection = select_sets(self.catalog)
@@ -111,6 +146,8 @@ class IntroductionTests(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertFalse(any("Hai già visto" in title.value for title in app.title))
         plan = list(app.session_state["recognition_plan"])
+        participant = app.session_state["participant_id"]
+        session = app.session_state["recording_session_id"]
         app.session_state["experiment_phase"] = "recognition_intro"
         app.run()
         self.assertEqual(app.title[0].value, "Hai già visto questo volto?")
@@ -119,6 +156,9 @@ class IntroductionTests(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertEqual(app.session_state["experiment_phase"], "recognition")
         self.assertEqual(app.session_state["recognition_plan"], plan)
+        self.assertEqual(app.session_state["participant_id"], participant)
+        self.assertEqual(app.session_state["recording_session_id"], session)
+        self.assertEqual({e["participant_id"] for e in app.session_state["feed_events"]}, {participant})
         self.assertTrue(any(e["event_type"] == "recognition_started" for e in app.session_state["feed_events"]))
 
 

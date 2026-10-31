@@ -4,7 +4,7 @@ export default function (component) {
   const { parentElement, data, setStateValue } = component;
   const root = parentElement.querySelector('#instalab-root');
   if (!root) return;
-  const participantId = data?.participant_id || 'DEMO_SESSION';
+  const participantId = data?.participant_id || data?.session_id || 'LOCAL_PREVIEW';
   const sessionId = data?.session_id || participantId;
   let sources = data?.image_sources || {};
   if (data?.phase === 'feed') {
@@ -210,11 +210,30 @@ export default function (component) {
       };
       const loaded=()=>{
         if(image.dataset.decoded==='true'){decoded();return;}
-        image.__decodePromise ||= image.decode ? image.decode() : Promise.resolve();
-        image.__decodePromise.then(decoded).catch(failed);
+        const promise=image.__decodePromise ||= image.decode ? image.decode() : Promise.resolve();
+        if(image.__observedDecode===promise)return;
+        image.__observedDecode=promise;
+        promise.then(()=>{
+          if(image.__decodePromise!==promise)return;
+          image.__decodePromise=null;image.__decodeRetries=0;
+          image.__notifyDecoded?.();
+        }).catch(()=>{
+          if(image.__decodePromise!==promise)return;
+          image.__decodePromise=null;
+          if(!root.contains(image))return;
+          // Moving an unfinished image during a rerender can abort decode(),
+          // even though its valid bytes have already loaded. Retry that decode
+          // against the current DOM instead of caching a rejected promise.
+          if(image.complete && image.naturalWidth && (image.__decodeRetries || 0)<2){
+            image.__decodeRetries=(image.__decodeRetries || 0)+1;
+            requestAnimationFrame(()=>image.__onLoaded?.());
+          }else image.__notifyFailed?.();
+        });
       };
+      // Pending callbacks must address the current card after a DOM rerender.
+      image.__notifyDecoded=decoded;image.__notifyFailed=failed;image.__onLoaded=loaded;
       image.onload=loaded;
-      image.onerror=failed;
+      image.onerror=()=>{image.__decodePromise=null;image.__notifyFailed?.();};
       if(image.complete){if(image.naturalWidth)loaded();else failed();}
     });
   };
@@ -257,7 +276,7 @@ export default function (component) {
       const image=btn.closest('.photo-wrap').querySelector('.post-photo');
       const source=postBy(id)?.image_url;
       if(image && source){
-        image.dataset.decoded='';image.__decodePromise=null;
+        image.dataset.decoded='';image.__decodePromise=null;image.__decodeRetries=0;
         const status=image.closest('.photo-wrap').querySelector('.image-load-status');
         status.querySelector('span').textContent='Caricamento immagine…';btn.hidden=true;
         image.removeAttribute('src');image.src=source;
