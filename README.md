@@ -88,7 +88,7 @@ L'app salva gli eventi (like, rimozione del like, dislike, rimozione del dislike
 
 Per scegliere un disco persistente, impostare `INSTALAB_DB_PATH` sul percorso completo del database **prima dell'avvio**. Il percorso è una configurazione del server, mai un parametro della pagina. Il salvataggio sopravvive alla chiusura della sessione e al riavvio del processo se il file resta sul disco; non sopravvive alla perdita di un disco effimero. Non è ancora configurato un database esterno. I dati di sessioni precedenti non vengono ripristinati nel browser di un altro partecipante.
 
-Il pannello `?preview=1` esporta solo gli eventi della sessione corrente. Per esportare tutte le sessioni, dal terminale del server con lo stesso `INSTALAB_DB_PATH`:
+Il pannello `?preview=1` esporta solo gli eventi della sessione corrente. L'**Area ricercatore** (`?researcher=1`) permette l'esportazione di più sessioni con accesso protetto (vedi sotto). In alternativa, dal terminale del server con lo stesso `INSTALAB_DB_PATH`:
 
 ```sh
 python event_store.py --output /percorso/privato/interazioni.csv
@@ -97,6 +97,28 @@ python event_store.py --output /percorso/privato/interazioni.csv
 Il database e gli export contengono dati di ricerca: conservarli fuori da Git e dalle cartelle pubbliche, limitare l'accesso e definire conservazione e backup prima del reclutamento. Errori di scrittura non vengono conteggiati come salvataggi riusciti: la pagina offre un pulsante per riprovare. Non chiudere la pagina finché il problema non è risolto.
 
 Il feed non offre più condivisione, invio o copia di link dei post. `anteprima.html` resta una dimostrazione frontend senza backend: per registrare gli eventi avviare `app.py` con Streamlit.
+
+## Area ricercatore: esportare le risposte dei soggetti
+
+Aprire l'app in **un'altra scheda** aggiungendo `?researcher=1` (oppure `&researcher=1` se sono già presenti altri parametri). La sezione non avvia una sessione sperimentale, non richiede il consenso da partecipante e non aggiunge eventi al database. Il registro viene letto solo dopo l'autenticazione; non è esposto dal normale feed.
+
+Su Streamlit Community Cloud, aprire **Settings → Secrets** dell'app e aggiungere la chiave `researcher_password`, scegliendo una password privata. Esempio di formato, da sostituire con una password propria prima di salvare:
+
+```toml
+researcher_password = "SOSTITUISCI_CON_UNA_PASSWORD_PRIVATA"
+```
+
+Non inserire la password nell'indirizzo, in chat o in GitHub. Per lo sviluppo locale si può usare `.streamlit/secrets.toml` (escluso da Git) oppure la variabile d'ambiente `INSTALAB_RESEARCHER_PASSWORD`, che ha precedenza sui Secrets. Non esiste una password predefinita e, in assenza di configurazione, la sezione non legge il database. L'accesso vale per la sessione del browser; **Esci dall'area ricercatore** lo termina e una modifica della password richiede un nuovo accesso. Cinque tentativi errati bloccano per un minuto ulteriori tentativi nella stessa sessione.
+
+Dopo l'accesso:
+
+- **Aggiorna dati** legge le sessioni attualmente presenti nel database del server, comprese quelle chiuse da altri partecipanti.
+- I filtri selezionano partecipante, sessioni, fase ed eventualmente solo sessioni con evento di riconoscimento completato.
+- **Risposte OLD/NEW (CSV)** esporta una riga per risposta con scelta, atteso, correttezza, tempo stimato e identificativi.
+- **Registro like/dislike (CSV)** include anche le rimozioni; **Reazioni finali per volto (CSV)** riporta LIKE, DISLIKE o NONE dopo una rimozione, separatamente per sessione e volto. I volti senza alcuna reazione non compaiono nel riepilogo.
+- **Registro completo (CSV)** esporta tutti gli eventi filtrati. La copia **JSON** conserva i valori originali e i metadati; nei CSV i testi interpretabili come formule dai fogli di calcolo vengono protetti con un apostrofo.
+
+L'anteprima a schermo è limitata a 500 risposte di memoria; i download includono tutte le righe filtrate. Nessuna azione della sezione cancella o modifica i dati. Il database non viene caricato da GitHub e non si recuperano database persi durante precedenti redeploy. La sezione di esportazione non sostituisce lo storage persistente e i backup necessari per uno studio reale.
 
 ## Fase di memoria OLD/NEW
 

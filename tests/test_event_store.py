@@ -38,6 +38,14 @@ class EventStoreTests(unittest.TestCase):
             list(pool.map(lambda n: save_events(f"session-{n}", [event()], self.path), range(4)))
         self.assertEqual(len(read_events(self.path)), 4)
 
+    def test_read_only_export_does_not_create_or_modify_database(self):
+        self.assertEqual(read_events(self.path), [])
+        self.assertFalse(self.path.exists())
+        save_events("session-a", [event()], self.path)
+        before = self.path.read_bytes()
+        self.assertEqual(len(read_events(self.path)), 1)
+        self.assertEqual(self.path.read_bytes(), before)
+
     def test_failed_batch_can_be_retried_without_partial_commit(self):
         bad = event("e2")
         bad["details"] = object()

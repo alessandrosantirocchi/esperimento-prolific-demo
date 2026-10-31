@@ -6,8 +6,6 @@ and example posts/stimuli in posts.json. Events are also committed to local SQLi
 
 from __future__ import annotations
 
-import csv
-import io
 import json
 import math
 import random
@@ -20,6 +18,8 @@ import streamlit as st
 from event_store import save_events
 from recognition import make_plan, score_response
 from image_assets import prepare_image
+from export_data import csv_bytes as export_csv
+from research_dashboard import render_dashboard
 
 BASE = Path(__file__).resolve().parent
 st.set_page_config(
@@ -28,6 +28,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+if str(st.query_params.get("researcher", "0")) == "1":
+    render_dashboard()
+    st.stop()
 
 # Remove Streamlit visual chrome so the simulation fills the entire viewport.
 st.markdown(
@@ -83,22 +87,6 @@ def load_frontend() -> tuple[str, str]:
         (BASE / "styles.css").read_text(encoding="utf-8"),
         (BASE / "feed.js").read_text(encoding="utf-8"),
     )
-
-
-def export_csv(events: list[dict]) -> bytes:
-    stream = io.StringIO()
-    columns = ["session_id", "event_id", "participant_id", "event_type", "post_id",
-               "stimulus_id", "stimulus_type", "client_ts", "server_received_ts",
-               "phase", "trial_id", "response", "target", "correct", "response_time_ms",
-               "displayed_client_ts", "elapsed_ms", "details"]
-    writer = csv.DictWriter(stream, fieldnames=columns)
-    writer.writeheader()
-    for event in events:
-        writer.writerow({k: (
-            json.dumps(event.get(k, {}), ensure_ascii=False) if k == "details"
-            else event.get(k, event.get("details", {}).get(k, ""))
-        ) for k in columns})
-    return stream.getvalue().encode("utf-8-sig")
 
 
 participant_id = str(st.query_params.get("PROLIFIC_PID", "DEMO_SESSION"))

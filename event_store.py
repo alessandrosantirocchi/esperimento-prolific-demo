@@ -39,31 +39,24 @@ def save_events(session_id: str, events: list[dict], path: Path | None = None) -
 
 
 def read_events(path: Path | None = None) -> list[dict]:
-    """Server-side researcher export; never exposed to participant sessions."""
+    """Read-only researcher export; never exposed to unauthenticated sessions."""
     destination = path if path is not None else database_path()
     if not destination.exists():
         return []
-    with closing(sqlite3.connect(destination, timeout=30)) as connection:
+    with closing(sqlite3.connect(destination.resolve().as_uri() + "?mode=ro", uri=True, timeout=30)) as connection:
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='events'").fetchone() is None:
+            return []
         return [dict(json.loads(payload), session_id=session_id) for session_id, payload
                 in connection.execute("SELECT session_id, payload FROM events ORDER BY rowid")]
 
 
 if __name__ == "__main__":
     import argparse
-    import csv
+    from export_data import csv_bytes
 
     parser = argparse.ArgumentParser(description="Export locally saved InstaLab events.")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     rows = read_events()
-    columns = ["session_id", "event_id", "participant_id", "event_type", "post_id",
-               "stimulus_id", "stimulus_type", "client_ts", "server_received_ts",
-               "phase", "trial_id", "response", "target", "correct", "response_time_ms",
-               "displayed_client_ts", "elapsed_ms", "details"]
-    with args.output.open("w", encoding="utf-8-sig", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns, extrasaction="ignore")
-        writer.writeheader()
-        for row in rows:
-            details = row.get("details", {})
-            writer.writerow({**details, **row, "details": json.dumps(details, ensure_ascii=False)})
+    args.output.write_bytes(csv_bytes(rows))
     print(f"Exported {len(rows)} events.")
