@@ -280,7 +280,8 @@ if phase == "recognition" and not remaining_trials:
     st.stop()
 
 seen_posts = {e.get("post_id") for e in st.session_state.feed_events if e.get("event_type") == "post_impression" and e.get("phase", "feed") == "feed"}
-phase1_ready = set(posts_by_id) <= seen_posts
+missing_post_ids = [post_id for post_id in st.session_state.feed_post_order if post_id not in seen_posts]
+phase1_ready = not missing_post_ids
 visible_posts = ordered_posts if phase == "feed" else [all_posts_by_id[remaining_trials[0]["post_id"]]]
 # Recognition receives only display data, never the answer key or old/new labels.
 if phase == "recognition":
@@ -315,6 +316,7 @@ response = feed_component(
         "stories": study.get("stories", []) if phase == "feed" else [],
         "phase": phase,
         "phase1_ready": phase1_ready,
+        "missing_post_ids": missing_post_ids,
         "trial_number": len(answered_ids) + 1,
         "trial_total": len(st.session_state.recognition_plan),
         "title": study.get("display_name", "InstaLab"),
@@ -333,6 +335,7 @@ new_events = response.events or []
 pending_events = []
 pending_ids = set()
 batch_answered_ids = set(answered_ids)
+batch_seen_posts = set(seen_posts)
 transition_requested = False
 for event in new_events:
     if not isinstance(event, dict):
@@ -343,6 +346,10 @@ for event in new_events:
     pending_ids.add(event_id)
     event = dict(event)
     event["phase"] = phase
+    if phase == "feed" and event.get("event_type") == "post_impression":
+        if event.get("post_id") not in posts_by_id or event["post_id"] in batch_seen_posts:
+            continue
+        batch_seen_posts.add(event["post_id"])
     if event.get("event_type") == "begin_recognition":
         if phase != "feed" or not phase1_ready:
             continue

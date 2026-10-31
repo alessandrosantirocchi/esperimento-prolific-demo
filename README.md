@@ -100,7 +100,7 @@ Il feed non offre più condivisione, invio o copia di link dei post. `anteprima.
 
 ## Fase di memoria OLD/NEW
 
-La pagina iniziale non anticipa il compito di memoria. Dopo aver scorso i 20 volti del feed con like/dislike, il pulsante **Continua** apre le istruzioni del riconoscimento. Il pulsante è disponibile quando le 20 visualizzazioni sono state registrate sul server (immagine caricata e almeno il 60% del post visibile). Non è necessario mettere una reazione a ogni post.
+La pagina iniziale non anticipa il compito di memoria. Dopo aver scorso i 20 volti del feed con like/dislike, il pulsante **Continua** apre le istruzioni del riconoscimento. Il pulsante è disponibile quando le 20 visualizzazioni sono state registrate sul server: immagine caricata e almeno il 60% dello spazio disponibile per la fotografia visibile (altezza della fotografia oppure del viewport, se inferiore). Il conteggio non richiede di mostrare il 60% di un intero post, che potrebbe essere impossibile su finestre basse. Il contatore a fine feed indica le visualizzazioni già confermate dal server; se manca un volto, **Mostra il prossimo volto da visualizzare** lo riporta al centro dello schermo. Il tracciamento viene ricollegato dopo like, commenti e chiusura dei popup. Non è necessario mettere una reazione a ogni post.
 
 Da **Inizia il riconoscimento** si passa a 20 prove, una fotografia per volta, con lo stesso stile del feed e due pulsanti al posto delle reazioni:
 
@@ -114,3 +114,7 @@ Ogni prova accetta una sola scelta. La prova successiva compare dopo il salvatag
 Negli export CSV sono presenti `phase`, `trial_id`, `response`, `target`, `correct`, `response_time_ms` e `displayed_client_ts`, oltre a post, stimolo e timestamp server. La correttezza viene calcolata dal server rispetto al piano di presentazione. Il tempo di risposta è una stima nel browser dal caricamento/visualizzazione dell'immagine al clic, non una misura validata per esperimenti di timing preciso; include eventuali interruzioni o schede in background. L'app non garantisce persistenza della sessione del browser dopo refresh o chiusura, né ripresa autenticata dal PID.
 
 È un protocollo provvisorio: proporzioni, bilanciamento, definizione di esposizione, tempi e familiarità delle fotografie vanno validati prima del reclutamento. Le istruzioni non dichiarano autorizzazioni etiche, durate o condizioni di conservazione non configurate.
+
+## Controlli di sviluppo
+
+Eseguire `python -m unittest discover -s tests`. Con Playwright e Chromium disponibili, `python tests/browser_continue.py` verifica il tracciamento su finestre basse, dopo like/commenti, il recupero dei volti mancanti e il segnale di Continua. `CHROMIUM_PATH` può indicare un eseguibile Chromium diverso.

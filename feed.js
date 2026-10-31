@@ -133,7 +133,7 @@ export default function (component) {
         <p class="recognition-status" aria-live="polite">${s.choice?'Risposta selezionata. Salvataggio in corso…':'Scegli OLD se hai visto il volto nel feed precedente, NEW se è nuovo.'}</p>
       </article></main></div>`;
   };
-  const home = () => `<div class="feed-area"><main class="timeline">${storyList()}<div class="post-list">${posts.map(post).join('')}</div><div class="end-feed"><div class="end-check">${ico('check')}</div><strong>Hai raggiunto la fine del feed</strong><span>${data?.phase1_ready?'Puoi proseguire.':'Scorri tutti i volti prima di proseguire. Attendi il salvataggio delle visualizzazioni.'}</span><button class="phase-next" data-action="begin_recognition" ${data?.phase1_ready?'':'disabled'}>Continua</button></div></main></div>`;
+  const home = () => `<div class="feed-area"><main class="timeline">${storyList()}<div class="post-list">${posts.map(post).join('')}</div><div class="end-feed"><div class="end-check">${ico('check')}</div><strong>Hai raggiunto la fine del feed</strong>${data?.phase==='feed'?`<span class="feed-progress" aria-live="polite">Volti visualizzati: ${posts.length-(data.missing_post_ids?.length ?? posts.length)} di ${posts.length}</span><span>${data.phase1_ready?'Puoi proseguire.':'Manca la visualizzazione di alcuni volti o il loro salvataggio è ancora in corso.'}</span>${!data.phase1_ready && data.missing_post_ids?.length?'<button class="review-unseen" data-action="review_unseen">Mostra il prossimo volto da visualizzare</button>':''}<button class="phase-next" data-action="begin_recognition" ${data.phase1_ready?'':'disabled'}>Continua</button>`:'<span>Fine dell’anteprima del feed.</span>'}</div></main></div>`;
   const explore = (savedOnly=false) => `<section class="other-page"><header class="other-header"><h2>${savedOnly?'Elementi salvati':'Esplora'}</h2><p>${savedOnly?'I post che hai salvato':'Scopri i post della simulazione'}</p></header><div class="explore-grid">${posts.filter(p=>!savedOnly||s.saved.has(p.id)).map(p=>`<button class="explore-tile" data-action="open_post" data-post="${escape(p.id)}"><img src="${escape(p.image_url)}" alt=""/><span>${ico('heart',true,18)} ${shorten(Number(p.initial_likes)||0)}</span></button>`).join('')||'<div class="empty-state">Non hai ancora salvato nessun post.</div>'}</div></section>`;
   const search = () => `<section class="other-page"><header class="other-header"><h2>Cerca</h2><p>Cerca profili e post dimostrativi</p></header><div class="search-box">${ico('search')}<input autofocus class="search-input" type="search" placeholder="Cerca" value="${escape(s.query)}" aria-label="Cerca nel feed" /></div><div class="search-results">${posts.filter(p=>p.username.toLowerCase().includes(s.query.toLowerCase())||p.caption.toLowerCase().includes(s.query.toLowerCase())).map(p=>`<button class="search-result" data-action="open_post" data-post="${escape(p.id)}">${profileAvatar(p.avatar_url)}<span><strong>${escape(p.username)}</strong><small>${escape(p.location)}</small></span>${ico('chevron',false,18)}</button>`).join('')}</div></section>`;
   const profile = () => `<section class="other-page profile-page"><div class="profile-header"><span class="large-avatar">${ico('profile',false,48)}</span><div><div class="profile-username">you.research <span class="demo-tag">Account demo</span></div><div class="profile-stats"><span><strong>0</strong> post</span><span><strong>0</strong> follower</span><span><strong>${s.followed.size}</strong> seguiti</span></div><p>Profilo di simulazione per studi di ricerca.</p></div></div><div class="profile-tabs"><button class="active">${ico('grid',false,17)} Post</button><button data-action="nav" data-tab="saved">${ico('bookmark',false,17)} Elementi salvati</button></div><div class="empty-state">I post del feed sono esempi, non appartengono a questo profilo.</div></section>`;
@@ -163,6 +163,11 @@ export default function (component) {
     const body = recognition ? recognitionCard(posts[0]) : s.tab==='home'?home():s.tab==='explore'?explore():s.tab==='saved'?explore(true):s.tab==='search'?search():s.tab==='profile'?profile():misc(s.tab);
     root.innerHTML = `<div class="instalab-shell"><div class="page-content">${body}</div>${modal()}</div>`;
     window.requestAnimationFrame(()=>window.scrollTo({top:y,behavior:'instant'}));
+    // Like/comment/modal renders replace the photo nodes: observe the new nodes.
+    if(observer) {
+      observer.disconnect();
+      if(s.tab==='home' && !s.overlay) root.querySelectorAll('.post .photo-wrap').forEach(el=>observer.observe(el));
+    }
     if (recognition) {
       const image = root.querySelector('.recognition-photo');
       const ready = () => window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{
@@ -186,6 +191,16 @@ export default function (component) {
       render();return;
     }
     if(action==='begin_recognition') {if(data?.phase1_ready)signal('begin_recognition');return;}
+    if(action==='review_unseen') {
+      const missingId=data?.missing_post_ids?.[0];
+      const target=missingId && root.querySelector(`article[data-post="${CSS.escape(missingId)}"] .photo-wrap`);
+      if(target){
+        s.seen.delete(missingId);
+        target.scrollIntoView({block:'center',behavior:'instant'});
+        if(observer){observer.unobserve(target);observer.observe(target);}
+      }
+      return;
+    }
     if(action==='nav') { s.tab=btn.dataset.tab; s.overlay=null; signal('navigate',null,{page:s.tab}); window.scrollTo(0,0); }
     else if(action==='like') {
       if(s.disliked.delete(id))signal('remove_dislike',id);
@@ -247,19 +262,22 @@ export default function (component) {
   if(!recognition && typeof IntersectionObserver!=='undefined' && s.tab==='home' && !s.overlay){
     observer=new IntersectionObserver(entries=>{
       for(const entry of entries){
-        const id=entry.target.getAttribute('data-post');
-        if(entry.isIntersecting&&!s.seen.has(id)){
+        const id=entry.target.closest('article[data-post]')?.dataset.post;
+        // A tall photo cannot occupy 60% of its own height on a short screen.
+        // Require 60% of the visible space available for that photo instead.
+        const requiredHeight=0.6*Math.min(entry.boundingClientRect.height,entry.rootBounds?.height || window.innerHeight);
+        const requiredWidth=0.6*Math.min(entry.boundingClientRect.width,entry.rootBounds?.width || window.innerWidth);
+        if(id && entry.isIntersecting && entry.intersectionRect.height>=requiredHeight && entry.intersectionRect.width>=requiredWidth && !s.seen.has(id)){
           const image=entry.target.querySelector('.post-photo');
           if(image && (!image.complete || !image.naturalWidth)) {
             image.addEventListener('load',()=>{if(observer && root.contains(entry.target)){observer.unobserve(entry.target);observer.observe(entry.target);}},{once:true});
             continue;
           }
-          s.seen.add(id);signal('post_impression',id,{threshold:0.6});
+          s.seen.add(id);signal('post_impression',id,{threshold:0.6,visibility_basis:'image_or_viewport',visible_height_px:Math.round(entry.intersectionRect.height)});
         }
       }
-    },{threshold:0.6});
+    },{threshold:Array.from({length:101},(_,i)=>i/100)});
   }
   render();
-  if(observer){root.querySelectorAll('article[data-post]').forEach(el=>observer.observe(el));}
   return () => { if(observer)observer.disconnect(); root.onclick=null;root.onsubmit=null;root.oninput=null;root.ondblclick=null; };
 }
