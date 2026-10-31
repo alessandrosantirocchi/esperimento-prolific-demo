@@ -4,7 +4,7 @@ Un feed **ispirato visivamente a Instagram**, realizzato in Streamlit con un com
 
 ## Files
 
-- `app.py`: ingresso Streamlit, gestione dei contenuti e raccolta temporanea del log.
+- `app.py`: ingresso Streamlit, gestione dei contenuti e registrazione degli eventi su SQLite.
 - `styles.css`: aspetto dell'interfaccia (colori, dimensioni, sidebar, versione smartphone).
 - `feed.js`: componenti grafici e interazioni (Like, commenti, salvataggi, storie, ecc.).
 - `posts.json`: configurazione di post, testi, autori, condizioni e stimoli.
@@ -52,7 +52,7 @@ Per una foto reale userai, ad esempio, `"stimulus_type": "real"`. Il campo `stim
 
 La radice del progetto deve contenere queste immagini in JPG/PNG/WEBP: non inserire percorso `assets/` in `posts.json` (questa demo cerca i file direttamente accanto a `app.py`).
 
-### Provare il feed / scaricare log temporaneo
+### Provare il feed / scaricare il log della sessione
 
 - Apri l'indirizzo dell'app per usare il feed.
 - Aggiungi `?preview=1` all'indirizzo per aprire il **pannello ricercatore** e scaricare un CSV degli eventi della sessione corrente.
@@ -61,23 +61,39 @@ La radice del progetto deve contenere queste immagini in JPG/PNG/WEBP: non inser
 
 ## Funzionalità della versione 1
 
-- Layout desktop (sidebar / feed / suggerimenti) e mobile (barra inferiore).
+- Feed centrato e responsive, senza pannelli laterali o navigazione mobile.
 - Storie cliccabili e visualizzatore.
 - Like e rimozione Like, anche con doppio clic sull'immagine.
 - Inserimento commenti (visibili all'interno della propria sessione).
-- Condivisione simulata, salvataggi, segui/non seguire.
+- Dislike e rimozione dislike, alternativi al like; salvataggio dei post. Nessun invio o condivisione.
 - Ricerca, Esplora, Profilo, visualizzazione di post in popup.
-- Tracking eventi dimostrativo (dati di sessione) + esportazione CSV nel pannello ricercatore.
+- Registrazione degli eventi su SQLite + esportazione CSV della sessione nel pannello ricercatore.
 
 ## IMPORTANTE prima di reclutare persone su Prolific
 
 Questa è una **demo di interfaccia**, non uno strumento di ricerca pronto per il campo:
 
-1. I dati NON vengono salvati su database persistente: la sessione può andare perduta.
-2. Non c'è ancora una pagina di consenso, assegnazione sperimentale o un ritorno con completion code a Prolific.
+1. Gli eventi vengono salvati in SQLite sul disco del server. Un disco effimero, come quello di Streamlit Community Cloud, non garantisce la conservazione dopo riavvii infrastrutturali o redeploy: per la raccolta reale configurare storage durevole e backup.
+2. È presente un consenso preliminare con informazioni ancora da completare. Non ci sono ancora assegnazione sperimentale o ritorno con completion code a Prolific.
 3. Le misure dei tempi e delle impressioni del feed sono approssimative, non validate per test cognitivi con timing preciso.
 4. Le immagini demo sono segnaposto. Verifica le autorizzazioni d'uso dei tuoi stimoli prima della pubblicazione.
 5. Il feed è una simulazione, senza accesso o connessione a Instagram.
 6. Si raccomanda di evitare che `PROLIFIC_PID` sia esposto o condiviso accidentalmente nei file esportati.
 
-Per uno studio reale, il prossimo passo è usare un database (es. Supabase), consenso, randomizzazione, procedure di privacy e test end-to-end del logging.
+Per uno studio reale, completare consenso e procedure di privacy, configurare conservazione durevole e backup e validare il protocollo e il logging sul deployment scelto.
+
+## Registrazione delle interazioni
+
+L'app salva gli eventi (like, rimozione del like, dislike, rimozione del dislike, commenti e impressioni) in `.local-data/events.sqlite3`, fuori dai file versionati. Non sono inviati a Instagram. Ogni evento include sessione, `PROLIFIC_PID` se presente, post, stimolo e orario di ricezione del server. All'inizio vengono salvati anche timestamp del consenso e ordine dei post. I reinvii dello stesso evento non creano duplicati e due sessioni senza PID hanno identificativi distinti.
+
+Per scegliere un disco persistente, impostare `INSTALAB_DB_PATH` sul percorso completo del database **prima dell'avvio**. Il percorso è una configurazione del server, mai un parametro della pagina. Il salvataggio sopravvive alla chiusura della sessione e al riavvio del processo se il file resta sul disco; non sopravvive alla perdita di un disco effimero. Non è ancora configurato un database esterno. I dati di sessioni precedenti non vengono ripristinati nel browser di un altro partecipante.
+
+Il pannello `?preview=1` esporta solo gli eventi della sessione corrente. Per esportare tutte le sessioni, dal terminale del server con lo stesso `INSTALAB_DB_PATH`:
+
+```sh
+python event_store.py --output /percorso/privato/interazioni.csv
+```
+
+Il database e gli export contengono dati di ricerca: conservarli fuori da Git e dalle cartelle pubbliche, limitare l'accesso e definire conservazione e backup prima del reclutamento. Errori di scrittura non vengono conteggiati come salvataggi riusciti: la pagina offre un pulsante per riprovare. Non chiudere la pagina finché il problema non è risolto.
+
+Il feed non offre più condivisione, invio o copia di link dei post. `anteprima.html` resta una dimostrazione frontend senza backend: per registrare gli eventi avviare `app.py` con Streamlit.

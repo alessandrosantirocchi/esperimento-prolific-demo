@@ -2,6 +2,8 @@
 
 import unittest
 import json
+import sqlite3
+from unittest.mock import patch
 from datetime import datetime
 from pathlib import Path
 
@@ -12,6 +14,11 @@ APP = Path(__file__).resolve().parents[1] / "app.py"
 
 
 class IntroductionTests(unittest.TestCase):
+    def setUp(self):
+        storage = patch("event_store.save_events")
+        self.storage = storage.start()
+        self.addCleanup(storage.stop)
+
     def test_consent_is_required_and_can_be_unchecked(self):
         app = AppTest.from_file(str(APP)).run()
         self.assertFalse(app.exception)
@@ -58,6 +65,21 @@ class IntroductionTests(unittest.TestCase):
             self.assertTrue((APP.parent / post["image"]).is_file())
         regions = [tuple(p["image_region"].values()) for p in posts if "image_region" in p]
         self.assertEqual(len(set(regions)), 10)
+
+    def test_failed_storage_is_reported_and_can_be_retried(self):
+        self.storage.side_effect = sqlite3.OperationalError("database is locked")
+        app = AppTest.from_file(str(APP)).run()
+        app.checkbox[0].check().run()
+        app.button[0].click().run()
+        self.assertFalse(app.exception)
+        self.assertEqual(len(app.error), 1)
+        self.assertEqual(app.session_state["feed_events"], [])
+        self.assertEqual(app.session_state["seen_event_ids"], set())
+        self.storage.side_effect = None
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertEqual(len(app.error), 0)
+        self.assertEqual(app.session_state["feed_events"][0]["event_type"], "session_started")
 
 
 if __name__ == "__main__":
