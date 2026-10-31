@@ -4,9 +4,16 @@ export default function (component) {
   const { parentElement, data, setStateValue } = component;
   const root = parentElement.querySelector('#instalab-root');
   if (!root) return;
-  const posts = Array.isArray(data?.posts) ? data.posts.map(p=>({...p,image_url:p.image_url || data?.image_sources?.[p.image_key] || ''})) : [];
-  const stories = Array.isArray(data?.stories) ? data.stories : [];
   const participantId = data?.participant_id || 'DEMO_SESSION';
+  const sessionId = data?.session_id || participantId;
+  let sources = data?.image_sources || {};
+  if (data?.phase === 'feed') {
+    const sessions = window.__instalabFeedAssets ||= new Map();
+    const cached = sessions.get(sessionId) || {};
+    Object.assign(cached, sources);sessions.set(sessionId, cached);sources = cached;
+  }
+  const posts = Array.isArray(data?.posts) ? data.posts.map(p=>({...p,image_url:p.image_url || sources[p.image_key] || ''})) : [];
+  const stories = Array.isArray(data?.stories) ? data.stories : [];
   const recognition = data?.phase === 'recognition';
   const phaseToken = `${data?.phase || 'feed'}:${recognition ? posts[0]?.id : ''}`;
   const escape = (v) => String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
@@ -40,12 +47,14 @@ export default function (component) {
   };
   const timeLabel = (m) => m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m/60)} h` : `${Math.floor(m/1440)} g`;
   const history = Array.isArray(data?.history) ? data.history : [];
+  const outbox = feedOutbox(sessionId, history);
+  const recovered = [...history, ...outbox.pending];
   let s = root.__instalab_state;
-  if (!s || s.participantId !== participantId || s.phaseToken !== phaseToken) {
-    s = { participantId, phaseToken, tab:'home', overlay:null, overlayPost:null, storyIndex:0, query:'',
+  if (!s || s.participantId !== participantId || s.sessionId !== sessionId || s.phaseToken !== phaseToken) {
+    s = { participantId, sessionId, phaseToken, tab:'home', overlay:null, overlayPost:null, storyIndex:0, query:'',
           liked:new Set(), disliked:new Set(), saved:new Set(), followed:new Set(), comments:{}, expanded:new Set(),
-          events:history.slice(), started:Date.now(), seen:new Set(), choice:null, shownAt:null, resetScroll:true };
-    for (const e of history) {
+          events:recovered.slice(), started:Date.now(), seen:new Set(), choice:null, shownAt:null, resetScroll:true };
+    for (const e of recovered) {
       if (e.event_type === 'like') s.liked.add(e.post_id);
       if (e.event_type === 'unlike') s.liked.delete(e.post_id);
       if (e.event_type === 'dislike') s.disliked.add(e.post_id);
@@ -64,16 +73,27 @@ export default function (component) {
   s.disliked ||= new Set();
 
   let observer;
+  let socialActionId = null;
+  const socialTypes = new Set(['like','unlike','dislike','remove_dislike','save','unsave','open_comments','expand_comments','comment_submit','share_confirmed']);
   const signal = (type, postId=null, details={}) => {
     const event = {
       event_id:`${Date.now()}-${Math.random().toString(36).slice(2,11)}`,
       event_type:type, post_id:postId, client_ts:new Date().toISOString(),
-      elapsed_ms:Date.now()-s.started, details
+      elapsed_ms:Date.now()-s.started, details: socialTypes.has(type) ? {...details, action_id:socialActionId || feedEventId()} : details
     };
     s.events.push(event);
+    outbox.push(event);
     // Keep all events in the browser for the demo session; Python deduplicates IDs.
-    setStateValue('events', s.events);
+    try {setStateValue('events', s.events);} catch (_) { /* Replay the outbox on reconnect. */ }
   };
+  let tracker;
+  if (!recognition) {
+    const trackers = window.__instalabFeedTrackers ||= new Map();
+    tracker = trackers.get(sessionId);
+    if (!tracker) {tracker = createFeedTracker(recovered);trackers.set(sessionId, tracker);}
+    tracker.connect(root, () => s.overlay ? [...root.querySelectorAll('.overlay .post-photo')] :
+      s.tab === 'home' ? [...root.querySelectorAll('.post-photo')] : [], signal);
+  }
   const postBy = (id) => posts.find(p => p.id === id);
   const profileAvatar = (image, extra='') => image
     ? `<img class="avatar-img ${extra}" alt="" src="${escape(image)}" />`
@@ -173,6 +193,7 @@ export default function (component) {
         status.querySelector('button').hidden=false;
         controls.forEach(button=>{button.disabled=true;});
         if(recognition)s.shownAt=null;
+        tracker?.update();
       };
       const decoded=()=>{
         if(!root.contains(image) || !image.naturalWidth)return;
@@ -180,6 +201,7 @@ export default function (component) {
         status.hidden=true;
         controls.forEach(button=>{button.disabled=recognition && (!!s.choice || s.shownAt===null);});
         if(observer){observer.unobserve(wrapper);observer.observe(wrapper);}
+        tracker?.update();
         if(recognition)window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{
           if(!root.contains(image))return;
           if(s.shownAt===null){s.shownAt=performance.now();s.shownAtClient=new Date().toISOString();}
@@ -198,6 +220,7 @@ export default function (component) {
   };
 
   const render = () => {
+    tracker?.beforeRender();
     const y=s.resetScroll?0:window.scrollY;
     s.resetScroll=false;
     const body = recognition ? recognitionCard(posts[0]) : s.tab==='home'?home():s.tab==='explore'?explore():s.tab==='saved'?explore(true):s.tab==='search'?search():s.tab==='profile'?profile():misc(s.tab);
@@ -216,7 +239,7 @@ export default function (component) {
       if(index>=0)image.replaceWith(candidates.splice(index,1)[0]);
     });
     root.replaceChildren(template.content);
-    window.requestAnimationFrame(()=>window.scrollTo({top:y,behavior:'instant'}));
+    window.requestAnimationFrame(()=>{window.scrollTo({top:y,behavior:'instant'});tracker?.afterRender();});
     // Like/comment/modal renders replace the photo nodes: observe the new nodes.
     if(observer) {
       observer.disconnect();
@@ -226,6 +249,7 @@ export default function (component) {
   };
 
   const perform = (btn) => {
+    socialActionId = feedEventId();
     const action=btn.dataset.action;
     const id=btn.dataset.post||null;
     if(btn.disabled)return;
@@ -247,7 +271,7 @@ export default function (component) {
       signal('recognition_response',id,{response:s.choice,response_time_ms:Math.round(performance.now()-s.shownAt),displayed_client_ts:s.shownAtClient});
       render();return;
     }
-    if(action==='begin_recognition') {if(data?.phase1_ready)signal('begin_recognition');return;}
+    if(action==='begin_recognition') {if(data?.phase1_ready){tracker?.finalize();signal('begin_recognition');}return;}
     if(action==='review_unseen') {
       const missingId=data?.missing_post_ids?.[0];
       const target=missingId && root.querySelector(`article[data-post="${CSS.escape(missingId)}"] .photo-wrap`);
@@ -293,6 +317,7 @@ export default function (component) {
     e.preventDefault();
     const id=form.dataset.commentPost, input=form.querySelector('input');
     const value=(input?.value||'').trim(); if(!value)return;
+    socialActionId = feedEventId();
     (s.comments[id] ||= []).push({username:'you.research',text:value});
     signal('comment_submit',id,{text:value,length:value.length});
     render();
@@ -310,6 +335,7 @@ export default function (component) {
     const p=e.target.closest('[data-doublepost]');if(!p)return;
     if(p.querySelector('.post-photo')?.dataset.decoded!=='true')return;
     const id=p.dataset.doublepost;
+    socialActionId = feedEventId();
     if(s.disliked.delete(id))signal('remove_dislike',id);
     if(!s.liked.has(id)){s.liked.add(id);signal('like',id,{method:'double_click'});}
     const heart=p.querySelector('.burst-heart');if(heart){heart.classList.remove('animate');void heart.offsetWidth;heart.classList.add('animate');}
@@ -337,6 +363,7 @@ export default function (component) {
     },{threshold:Array.from({length:101},(_,i)=>i/100)});
   }
   render();
+  if (outbox.pending.length) {try {setStateValue('events', s.events);} catch (_) {}}
   const preloads=root.__imagePreloads ||= new Map();
   for(const source of data?.preload_images || []){
     if(!source || preloads.has(source))continue;
@@ -345,5 +372,5 @@ export default function (component) {
     preloads.set(source,image);
     if(preloads.size>4)preloads.delete(preloads.keys().next().value);
   }
-  return () => { if(observer)observer.disconnect(); root.onclick=null;root.onsubmit=null;root.oninput=null;root.ondblclick=null; };
+  return () => { if(observer)observer.disconnect();tracker?.cleanup(); root.onclick=null;root.onsubmit=null;root.oninput=null;root.ondblclick=null; };
 }

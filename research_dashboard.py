@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 import streamlit as st
+from feed_metrics import feed_metrics_rows, FEED_METRIC_COLUMNS
 from streamlit.errors import StreamlitSecretNotFoundError
 
 from event_store import read_events, delete_sessions
@@ -199,6 +200,8 @@ def render_dashboard():
         completed = st.checkbox("Solo sessioni con riconoscimento completato", key="research_completed")
 
     filtered = filter_events(events, participant, selected_sessions, phase, completed)
+    selected_events = filter_events(events, participant, selected_sessions, None, completed)
+    feed_rows = feed_metrics_rows(selected_events)
     memory = [e for e in filtered if e.get("event_type") == "recognition_response"]
     reactions = [e for e in filtered if e.get("event_type") in REACTION_TYPES]
     final = final_reactions(filtered)
@@ -219,6 +222,9 @@ def render_dashboard():
         st.download_button("Registro like/dislike (CSV)", csv_bytes(reactions), "instalab_reazioni_eventi.csv", "text/csv", disabled=not reactions)
         st.download_button("Registro completo (CSV)", csv_bytes(filtered), "instalab_eventi.csv", "text/csv", disabled=not filtered)
     st.download_button("Copia dei dati filtrati (JSON)", json.dumps(filtered, ensure_ascii=False, indent=2).encode("utf-8"), "instalab_dati.json", "application/json", disabled=not filtered)
+    st.download_button("Metriche del feed (CSV)", csv_bytes(feed_rows, FEED_METRIC_COLUMNS),
+                       "feed_metrics.csv", "text/csv", disabled=not feed_rows)
+    st.caption("Le metriche del feed riguardano le sessioni selezionate, indipendentemente dal filtro Fase. Il file definitivo è disponibile dopo la finalizzazione del feed; le sessioni ancora in corso restano nel registro eventi. Dati temporali mancanti sono vuoti e segnalati da metrics_missing, distinti dagli zeri dei volti mai visualizzati.")
     st.caption("Le reazioni finali includono i volti con almeno una reazione: LIKE, DISLIKE oppure NONE se rimossa. I volti senza reazioni non compaiono in questo file. Il JSON conserva i valori testuali originali; nei CSV i testi che potrebbero essere interpretati come formule sono protetti.")
 
     st.subheader("Anteprima risposte di memoria")

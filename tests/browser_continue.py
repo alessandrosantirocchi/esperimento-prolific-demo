@@ -25,7 +25,7 @@ def run():
     data = {"posts": posts, "phase": "feed", "history": [], "phase1_ready": False,
             "missing_post_ids": [p["id"] for p in posts]}
     css = (BASE / "styles.css").read_text().replace(":host {", "body {", 1)
-    js = (BASE / "feed.js").read_text().replace("export default function (component)", "function initFeed(component)", 1)
+    js = (BASE / "feed_tracking.js").read_text() + "\n" + (BASE / "feed.js").read_text().replace("export default function (component)", "function initFeed(component)", 1)
     html = ('<style>html,body{margin:0}' + css + '</style><div id="instalab-root"></div><script>' + js +
             '\nwindow.events=[];window.hostData=' + json.dumps(data) + ';' +
             'window.mount=()=>{window.cleanup?.();window.cleanup=initFeed({parentElement:document,data:window.hostData,' +

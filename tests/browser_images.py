@@ -27,7 +27,7 @@ def run():
     data = {"posts": posts, "image_sources": images, "phase": "feed", "history": [],
             "phase1_ready": False, "missing_post_ids": [p["id"] for p in posts]}
     css = (BASE / "styles.css").read_text().replace(":host {", "body {", 1)
-    js = (BASE / "feed.js").read_text().replace("export default function (component)", "function initFeed(component)", 1)
+    js = (BASE / "feed_tracking.js").read_text() + "\n" + (BASE / "feed.js").read_text().replace("export default function (component)", "function initFeed(component)", 1)
     html = ('<style>html,body{margin:0}' + css + '</style><div id="instalab-root"></div><script>' + js +
             '\nwindow.events=[];window.hostData=' + json.dumps(data) + ';' +
             'window.mount=()=>{window.cleanup?.();window.cleanup=initFeed({parentElement:document,data:window.hostData,' +
@@ -49,7 +49,7 @@ def run():
             form = page.locator('form[data-comment-post]').first
             form.locator('input').fill('Verifica caricamento')
             form.locator('button').click()
-            page.evaluate('window.mount();window.mount()')
+            page.evaluate('window.hostData.image_sources={};window.mount();window.mount()')
             assert page.evaluate('window.originalImages.every((image,index)=>image===document.querySelectorAll(".post-photo")[index] && image.dataset.decoded==="true")')
             assert page.locator('.image-load-status:not([hidden])').count() == 0
             # A broken decode cannot accept a rating, and retry restores the same face.

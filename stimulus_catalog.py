@@ -182,7 +182,8 @@ def display_post(record):
 
 def public_history(events):
     detail_fields = {"method", "text", "length", "username", "page", "response",
-                     "response_time_ms", "displayed_client_ts", "threshold", "visibility_basis", "visible_height_px"}
+                     "response_time_ms", "displayed_client_ts", "threshold", "visibility_basis", "visible_height_px",
+                     "tracking_version", "exposure_id", "exposure_index", "started_client_ts", "duration_ms", "closed", "reason", "action_id"}
     rows = []
     for event in events:
         row = {key: event[key] for key in ("event_id", "event_type", "post_id", "client_ts", "elapsed_ms", "trial_id") if key in event}

@@ -103,6 +103,7 @@ Dopo l'accesso, **Aggiorna dati** legge le sessioni del server. I filtri consent
 - **Registro like/dislike (CSV)**: reazioni e rimozioni.
 - **Reazioni finali per volto (CSV)**: LIKE, DISLIKE o NONE per ogni volto su cui è stata espressa almeno una reazione.
 - **Registro completo (CSV/JSON)**: tutti gli eventi filtrati; il JSON mantiene i metadati strutturati. I CSV proteggono i testi interpretabili come formule dai fogli di calcolo.
+- **Metriche del feed (CSV)**: `feed_metrics.csv`, una riga per ciascuno dei 30 post assegnati, dopo la finalizzazione del feed, con tempi al 75%, reazioni e azioni social. Comprende gli zeri dei post mai sufficientemente visibili e segnala i tempi mancanti. Vedi [definizioni e limiti delle metriche](docs/feed_metrics.md).
 
 L'anteprima della memoria mostra al massimo 500 righe, mentre i download includono tutte le righe filtrate. **Esci dall'area ricercatore** termina l'accesso per quella sessione del browser. Il parametro precedente `?preview=1` è un pannello di sviluppo della singola sessione, non sostituisce l'area ricercatore protetta.
 
@@ -128,6 +129,7 @@ Il file SQLite rimane dopo un riavvio solo se il disco resta disponibile. Il dis
 - `event_store.py`, `export_data.py`, `research_dashboard.py`: salvataggio, export e gestione ricercatore.
 - `feed.js`, `styles.css`: interfaccia e interazioni.
 - `image_assets.py`: derivate WebP in memoria (qualità 92, lato massimo 960 px), orientamento EXIF e cache; originali invariati. Prima presentazione e OLD usano la stessa derivata.
+- `feed_tracking.js`, `feed_metrics.py`: timer della Fase 1, gestione dei checkpoint e aggregazione delle metriche esportate.
 
 Il browser riceve nel feed solo le 30 immagini selezionate e nel riconoscimento la prova attuale con precaricamento delle due successive. I NEW non vengono inviati nella prima fase. Le immagini decodificate vengono mantenute durante gli aggiornamenti. Un errore abilita **Riprova caricamento** e impedisce risposte su un'immagine non caricata.
 
@@ -135,6 +137,6 @@ Il browser riceve nel feed solo le 30 immagini selezionate e nel riconoscimento 
 python -m unittest discover -s tests
 ```
 
-I controlli browser facoltativi richiedono Playwright e Chromium: `python tests/browser_continue.py` e `python tests/browser_images.py`. La variabile `CHROMIUM_PATH` può indicare un eseguibile diverso.
+I controlli browser facoltativi richiedono Playwright e Chromium: `python tests/browser_continue.py`, `python tests/browser_images.py` e `python tests/browser_feed_metrics.py`. La variabile `CHROMIUM_PATH` può indicare un eseguibile diverso.
 
 I vecchi contenuti dimostrativi, la configurazione JSON sostituita dal manifest, le anteprime statiche e i file di sistema macOS sono stati rimossi. Test automatici, immagini del nuovo catalogo e dati raccolti vengono conservati. Le rimozioni non cancellano la cronologia Git; per pubblicare le modifiche occorre un successivo commit e push esplicitamente richiesto.

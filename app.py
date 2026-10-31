@@ -20,6 +20,7 @@ from image_assets import prepare_image
 from export_data import csv_bytes as export_csv
 from research_dashboard import render_dashboard
 from experiment_protocol import PROTOCOL_VERSION
+from feed_metrics import TRACKING_VERSION, FEED_METRIC_COLUMNS, feed_metrics_rows, valid_view_details
 from stimulus_catalog import (load_catalog, select_sets, CatalogError, METADATA_FIELDS,
                               display_post, public_history)
 
@@ -72,7 +73,7 @@ def load_stimuli(catalog, selection) -> dict:
 def load_frontend() -> tuple[str, str]:
     return (
         (BASE / "styles.css").read_text(encoding="utf-8"),
-        (BASE / "feed.js").read_text(encoding="utf-8"),
+        (BASE / "feed_tracking.js").read_text(encoding="utf-8") + "\n" + (BASE / "feed.js").read_text(encoding="utf-8"),
     )
 
 
@@ -280,6 +281,8 @@ if phase == "recognition" and not remaining_trials:
         if str(st.query_params.get("preview", "0")) == "1":
             st.download_button("Scarica interazioni CSV", export_csv(st.session_state.feed_events),
                                "instalab_interazioni.csv", "text/csv")
+            st.download_button("Metriche del feed (CSV)", export_csv(feed_metrics_rows(st.session_state.feed_events), FEED_METRIC_COLUMNS),
+                               "feed_metrics.csv", "text/csv")
     st.stop()
 
 seen_posts = {e.get("post_id") for e in st.session_state.feed_events if e.get("event_type") == "post_impression" and e.get("phase", "feed") == "feed"}
@@ -309,6 +312,11 @@ preload_images = []
 if phase == "recognition":
     preload_images = [all_posts_by_id[t["post_id"]]["image_url"] for t in remaining_trials[1:3]]
 
+# The feed tracker acknowledges the browser's per-session asset cache. Timer
+# checkpoints must not retransmit every face on each Streamlit rerun.
+if phase == "feed" and any(e.get("event_type") == "feed_tracking_started" for e in st.session_state.feed_events):
+    image_sources = {}
+
 feed_component = st.components.v2.component(
     "instalab_social_feed",
     html='<div id="instalab-root" aria-label="Simulazione di social feed"></div>',
@@ -331,6 +339,7 @@ response = feed_component(
         "trial_total": len(st.session_state.recognition_plan),
         "title": study.get("display_name", "InstaLab"),
         "participant_id": participant_id,
+        "session_id": st.session_state.recording_session_id,
         "history": public_history(st.session_state.feed_events),
     },
     default={"events": []},
@@ -354,6 +363,18 @@ for event in new_events:
     pending_ids.add(event_id)
     event = dict(event)
     event["phase"] = phase
+    if str(event.get("event_type", "")).startswith("feed_"):
+        if phase != "feed":
+            continue
+        details = event.get("details", {})
+        if event.get("event_type") == "feed_view":
+            if event.get("post_id") not in posts_by_id or not valid_view_details(details):
+                continue
+        elif event.get("event_type") in {"feed_tracking_started", "feed_tracking_finalized"}:
+            if not isinstance(details, dict) or details.get("tracking_version") != TRACKING_VERSION:
+                continue
+        else:
+            continue
     if phase == "feed" and event.get("event_type") == "post_impression":
         if event.get("post_id") not in posts_by_id or event["post_id"] in batch_seen_posts:
             continue
@@ -388,6 +409,7 @@ for event in new_events:
     post = all_posts_by_id.get(event.get("post_id"))
     for field in METADATA_FIELDS:
         event[field] = post.get(field, "") if post else ""
+    event["feed_position"] = st.session_state.feed_post_order.index(event["post_id"]) + 1 if event.get("post_id") in posts_by_id else ""
     event["server_received_ts"] = datetime.now(timezone.utc).isoformat()
     pending_events.append(event)
 
@@ -417,6 +439,7 @@ try:
                         "recognition_plan": st.session_state.recognition_plan,
                         "catalog_fingerprint": catalog.fingerprint,
                         "protocol_version": PROTOCOL_VERSION,
+                        "feed_tracking_version": TRACKING_VERSION,
                         "stimuli": [{field: p[field] for field in ("id", "image", "sha256") + METADATA_FIELDS}
                                     for p in study["posts"] + study["recognition_new_posts"]]},
         })
@@ -450,3 +473,6 @@ if str(st.query_params.get("preview", "0")) == "1":
             file_name="instalab_interazioni_demo.csv",
             mime="text/csv",
         )
+        metric_rows = feed_metrics_rows(st.session_state.feed_events)
+        st.download_button("Metriche del feed (CSV)", export_csv(metric_rows, FEED_METRIC_COLUMNS),
+                           "feed_metrics.csv", "text/csv", disabled=not metric_rows)
