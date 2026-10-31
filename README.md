@@ -1,162 +1,140 @@
-# InstaLab — simulazione di feed social per ricerca
+# InstaLab — feed social e riconoscimento di volti
 
-Un feed **ispirato visivamente a Instagram**, realizzato in Streamlit con un componente personalizzato HTML/CSS/JavaScript. Non è Instagram e non usa account, API o dati del social network.
+Applicazione Streamlit con un feed ispirato a Instagram, reazioni like/dislike, commenti e successivo compito di memoria OLD/NEW. Non usa account, API o dati di Instagram. Il protocollo prevede 30 volti nel feed e 60 prove di memoria, con quote uguali per categoria e genere.
 
-## Files
+## Provare l'app in locale
 
-- `app.py`: ingresso Streamlit, gestione dei contenuti e registrazione degli eventi su SQLite.
-- `styles.css`: aspetto dell'interfaccia (colori, dimensioni, sidebar, versione smartphone).
-- `feed.js`: componenti grafici e interazioni (Like, commenti, salvataggi, storie, ecc.).
-- `posts.json`: configurazione di post, testi, autori, condizioni e stimoli.
-- `demo_01.jpg` ... `demo_04.jpg`: **immagini di prova**, NON i tuoi stimoli deepfake.
-- `requirements.txt`: versione compatibile di Streamlit.
-- `anteprima.html`: anteprima autonoma del feed, da aprire in Chrome o Safari senza Streamlit.
-
-## Aggiornare l'app esistente su GitHub (senza programmare)
-
-1. Scarica e **decomprimi** lo ZIP.
-2. Vai su `https://github.com/alessandrosantirocchi/esperimento-prolific-demo`.
-3. Clicca **Add file → Upload files** nella pagina principale del repository.
-4. Trascina **tutti i file contenuti nella cartella decompressa** sulla pagina di caricamento, non lo ZIP. Non serve la cartella `__pycache__`.
-5. GitHub potrebbe indicare che `app.py` e `requirements.txt` esistono già: è previsto; carica le nuove versioni e clicca **Commit changes**.
-6. Se l'app è già pubblicata su Streamlit Community Cloud, in genere si aggiornerà dopo il commit. Altrimenti, vai su `https://share.streamlit.io` → **Create app** → **Yup, I have an app**, poi Repository `alessandrosantirocchi/esperimento-prolific-demo`, Branch `main`, Main file path `app.py`, infine **Deploy**.
-
-## Modificare a mano da GitHub
-
-1. Apri il repository, clicca **posts.json** (o `styles.css` o `feed.js`).
-2. Premi la **matita** (Edit this file).
-3. Modifica il testo, poi premi **Commit changes**.
-4. La modifica viene distribuita da Streamlit dopo il commit.
-
-**Dove modificare:**
-
-| Obiettivo | File |
-|---|---|
-| Modificare post, nomi, caption, ordine, numero di Like iniziali | `posts.json` |
-| Sostituire immagini con foto reali/deepfake | carica foto nella radice del repository e cambia `image` in `posts.json` |
-| Cambiare colori, font, dimensioni delle schede, layout mobile | `styles.css` |
-| Cambiare i comportamenti di Like, commenti, pulsanti, storie | `feed.js` |
-| Modificare lettura dei dati, ID Prolific, esportazione | `app.py` |
-
-### Esempio: inserire una foto deepfake
-
-Carica una foto chiamata `face_fake_01.jpg` in **GitHub → Add file → Upload files**. Poi, in `posts.json`, cambia il campo relativo a un post:
-
-```json
-"image": "face_fake_01.jpg",
-"stimulus_id": "DF_001",
-"stimulus_type": "deepfake"
-```
-
-Per una foto reale userai, ad esempio, `"stimulus_type": "real"`. Il campo `stimulus_type` è un'etichetta **interna** che non appare al partecipante ma viene esportata nei dati.
-
-La radice del progetto deve contenere queste immagini in JPG/PNG/WEBP: non inserire percorso `assets/` in `posts.json` (questa demo cerca i file direttamente accanto a `app.py`).
-
-### Provare il feed / scaricare il log della sessione
-
-- Apri l'indirizzo dell'app per usare il feed.
-- Aggiungi `?preview=1` all'indirizzo per aprire il **pannello ricercatore** e scaricare un CSV degli eventi della sessione corrente.
-- Puoi testare la lettura del parametro Prolific con `?PROLIFIC_PID=TEST001&preview=1`.
-- Gli eventi riportano `event_type`, `post_id`, `stimulus_id`, `stimulus_type`, ora del client e tempo approssimato trascorso.
-
-## Funzionalità della versione 1
-
-- Feed centrato e responsive, senza pannelli laterali o navigazione mobile.
-- Storie cliccabili e visualizzatore.
-- Like e rimozione Like, anche con doppio clic sull'immagine.
-- Inserimento commenti (visibili all'interno della propria sessione).
-- Dislike e rimozione dislike, alternativi al like; salvataggio dei post. Nessun invio o condivisione.
-- Ricerca, Esplora, Profilo, visualizzazione di post in popup.
-- Registrazione degli eventi su SQLite + esportazione CSV della sessione nel pannello ricercatore.
-
-## IMPORTANTE prima di reclutare persone su Prolific
-
-Questa è una **demo di interfaccia**, non uno strumento di ricerca pronto per il campo:
-
-1. Gli eventi vengono salvati in SQLite sul disco del server. Un disco effimero, come quello di Streamlit Community Cloud, non garantisce la conservazione dopo riavvii infrastrutturali o redeploy: per la raccolta reale configurare storage durevole e backup.
-2. È presente un consenso preliminare con informazioni ancora da completare. Non ci sono ancora assegnazione sperimentale o ritorno con completion code a Prolific.
-3. Le misure dei tempi e delle impressioni del feed sono approssimative, non validate per test cognitivi con timing preciso.
-4. Le immagini demo sono segnaposto. Verifica le autorizzazioni d'uso dei tuoi stimoli prima della pubblicazione.
-5. Il feed è una simulazione, senza accesso o connessione a Instagram.
-6. Si raccomanda di evitare che `PROLIFIC_PID` sia esposto o condiviso accidentalmente nei file esportati.
-
-Per uno studio reale, completare consenso e procedure di privacy, configurare conservazione durevole e backup e validare il protocollo e il logging sul deployment scelto.
-
-## Registrazione delle interazioni
-
-L'app salva gli eventi (like, rimozione del like, dislike, rimozione del dislike, commenti e impressioni) in `.local-data/events.sqlite3`, fuori dai file versionati. Non sono inviati a Instagram. Ogni evento include sessione, `PROLIFIC_PID` se presente, post, stimolo e orario di ricezione del server. All'inizio vengono salvati anche timestamp del consenso e ordine dei post. I reinvii dello stesso evento non creano duplicati e due sessioni senza PID hanno identificativi distinti.
-
-Per scegliere un disco persistente, impostare `INSTALAB_DB_PATH` sul percorso completo del database **prima dell'avvio**. Il percorso è una configurazione del server, mai un parametro della pagina. Il salvataggio sopravvive alla chiusura della sessione e al riavvio del processo se il file resta sul disco; non sopravvive alla perdita di un disco effimero. Non è ancora configurato un database esterno. I dati di sessioni precedenti non vengono ripristinati nel browser di un altro partecipante.
-
-Il pannello `?preview=1` esporta solo gli eventi della sessione corrente. L'**Area ricercatore** (`?researcher=1`) permette l'esportazione di più sessioni con accesso protetto (vedi sotto). In alternativa, dal terminale del server con lo stesso `INSTALAB_DB_PATH`:
+Richiede Python 3.11 o successivo. Nel terminale, dalla cartella del repository:
 
 ```sh
-python event_store.py --output /percorso/privato/interazioni.csv
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python validate_stimuli.py
+python -m streamlit run app.py
 ```
 
-Il database e gli export contengono dati di ricerca: conservarli fuori da Git e dalle cartelle pubbliche, limitare l'accesso e definire conservazione e backup prima del reclutamento. Errori di scrittura non vengono conteggiati come salvataggi riusciti: la pagina offre un pulsante per riprovare. Non chiudere la pagina finché il problema non è risolto.
+Su Windows usare `python` al posto di `python3` e attivare l'ambiente con `.venv\Scripts\Activate.ps1` in PowerShell.
 
-Il feed non offre più condivisione, invio o copia di link dei post. `anteprima.html` resta una dimostrazione frontend senza backend: per registrare gli eventi avviare `app.py` con Streamlit.
+Aprire l'indirizzo mostrato da Streamlit. Per controllare il mantenimento dell'identificativo Prolific aggiungere `?PROLIFIC_PID=TEST001`. Accettare il consenso, scorrere tutti i volti, premere **Continua**, leggere le istruzioni e avviare il riconoscimento. Per una nuova sessione ricaricare la pagina. Non è implementata la ripresa di una sessione interrotta tramite PID.
 
-## Area ricercatore: esportare le risposte dei soggetti
+Le prove locali registrano dati nello stesso modo delle altre sessioni. Per tenere un database di prova separato, impostare `INSTALAB_DB_PATH` prima dell'avvio, per esempio su macOS/Linux:
 
-Aprire l'app in **un'altra scheda** aggiungendo `?researcher=1` (oppure `&researcher=1` se sono già presenti altri parametri). La sezione non avvia una sessione sperimentale, non richiede il consenso da partecipante e non aggiunge eventi al database. Il registro viene letto solo dopo l'autenticazione; non è esposto dal normale feed.
+```sh
+INSTALAB_DB_PATH="$PWD/.local-data/prove.sqlite3" python -m streamlit run app.py
+```
 
-Su Streamlit Community Cloud, aprire **Settings → Secrets** dell'app e aggiungere la chiave `researcher_password`, scegliendo una password privata. Esempio di formato, da sostituire con una password propria prima di salvare:
+## Catalogo degli stimoli
+
+L'unica fonte degli stimoli è `stimuli.csv`, accanto ad `app.py`, con le immagini nella cartella `images/`. Non ci sono più immagini demo di ripiego. Gli originali non vengono modificati.
+
+Il CSV deve essere UTF-8, con separatore virgola e queste intestazioni:
+
+```csv
+stimulus_id,filename,source_type,gender
+REAL_F_001,REAL_F_001.png,real,F
+```
+
+| Colonna | Contenuto |
+|---|---|
+| `stimulus_id` | Identificativo univoco assegnato dal ricercatore |
+| `filename` | Nome esatto del file, comprese maiuscole/minuscole ed estensione |
+| `source_type` | `real`, `gan` oppure `transformer` |
+| `gender` | Etichetta `F` oppure `M` indicata dal ricercatore |
+
+Sono ammessi JPG/JPEG, PNG e WebP. Il percorso può essere un semplice nome, un percorso sotto `images/`, oppure includere il prefisso `images/`, per esempio `images/gruppo/volto.png`. Percorsi assoluti o che escono da `images/` non sono ammessi. I percorsi vengono risolti dalla posizione di `app.py`, indipendentemente dalla directory di avvio: non occorrono percorsi del computer del ricercatore su Streamlit Cloud.
+
+Le etichette vengono lette dal CSV, senza dedurle dal nome o dall'aspetto del volto. Per sostituire gli stimoli, aggiornare insieme immagini e manifest e avviare nuove sessioni: l'app ferma una sessione già iniziata se rileva una modifica del catalogo.
+
+### Verifica del catalogo
+
+`python validate_stimuli.py` verifica intestazioni, valori obbligatori, categorie, genere, percorsi, file mancanti o illeggibili, ID duplicati, file ripetuti, contenuti identici e immagini con gli stessi pixel anche se ricodificate. Controlla inoltre la disponibilità dei volti nuovi e segnala immagini non elencate nel CSV. Esce con codice 1 in caso di errore; `--json` produce il rapporto strutturato. I controlli non riconoscono la stessa identità in fotografie differenti.
+
+Catalogo verificato in questa modifica:
+
+| Categoria | F | M | Totale |
+|---|---:|---:|---:|
+| real | 20 | 20 | 40 |
+| gan | 20 | 20 | 40 |
+| transformer | 40 | 40 | 80 |
+| **Totale** | **80** | **80** | **160** |
+
+Nessun file mancante, illeggibile, ripetuto o non elencato rilevato. L'app mostra un messaggio generale se la configurazione non è valida; il comando di verifica fornisce al ricercatore i dettagli senza mostrarli ai partecipanti.
+
+## Selezione e procedura
+
+Per ogni nuova sessione vengono estratti e fissati:
+
+- **Feed:** 30 volti, 10 reali, 10 GAN e 10 transformer. Ogni categoria comprende 5 F e 5 M, in ordine casuale.
+- **Riserva NEW:** 30 volti distinti da tutti quelli del feed, anche questi 10 reali, 10 GAN e 10 transformer, con 5 F e 5 M per categoria.
+- **Riconoscimento:** 60 prove in ordine casuale, con tutti i 30 volti del feed ripresentati una volta come OLD e i 30 volti della riserva come NEW. Ciascuna combinazione categoria × OLD/NEW comprende 5 F e 5 M.
+
+Il totale è di **90 presentazioni e 60 immagini distinte** per partecipante. La selezione e l'ordine variano casualmente tra sessioni; categorie e genere hanno quote fisse. La selezione resta stabile durante gli aggiornamenti della stessa sessione.
+
+Dopo i 30 volti del feed restano **130 volti non presentati**, più dei 30 NEW necessari; 100 immagini non vengono utilizzate in quella sessione. Servono almeno 10 file distinti per ciascuna combinazione categoria/genere: 5 per il feed e 5 per i NEW, quindi almeno 60 file complessivi. Una carenza in una categoria non può essere compensata con un'altra. In caso di insufficienza la validazione blocca l'avvio, senza riutilizzare volti come NEW.
+
+La versione del protocollo viene registrata nei metadati degli eventi di avvio e assegnazione del piano. Una sessione avviata con il vecchio schema viene fermata e richiede di ricaricare la pagina per iniziarne una nuova; i dati precedenti non vengono modificati.
+
+Il consenso preliminare è obbligatorio. Le istruzioni di memoria appaiono dopo il feed. **Continua** diventa disponibile quando il server ha registrato tutte le visualizzazioni: fotografia decodificata e almeno il 60% dell'altezza disponibile per l'immagine visibile (il minimo tra altezza della fotografia e del viewport). **Mostra il prossimo volto da visualizzare** permette di recuperare una visualizzazione mancante. Non è obbligatoria una reazione a ogni post.
+
+Il riconoscimento presenta una fotografia per volta e consente una sola risposta OLD/NEW, senza feedback di correttezza. La prova successiva arriva dopo il salvataggio. La confidenza non è implementata. Il PID e la sessione sono gli stessi delle due parti.
+
+## Metadati ed esportazione
+
+Per gli eventi riferiti a un volto e per le reazioni finali, gli export CSV/JSON includono `stimulus_id`, `filename`, `source_type` e `gender`. È mantenuta anche la colonna precedente `stimulus_type` (`real`/`deepfake`) per compatibilità con il raggruppamento binario. Gli eventi generali della sessione non hanno uno stimolo associato; le loro colonne restano vuote. I vecchi eventi salvati prima di questa modifica non vengono alterati e possono avere vuote le nuove colonne.
+
+Questi metadati, i percorsi originali e la soluzione OLD/NEW non vengono inviati al componente del partecipante. Il feed usa ID e nomi di profilo neutri e immagini incorporate. All'avvio vengono salvati sul server il consenso, l'ordine dei post, il piano di memoria, la versione del protocollo, l'impronta del catalogo e i metadati dei 60 stimoli selezionati, con hash dei file per la tracciabilità.
+
+Gli export di memoria conservano anche `phase`, `trial_id`, `response`, `target`, `correct`, `response_time_ms` e `displayed_client_ts`. La correttezza viene calcolata dal server. I tempi sono stime nel browser, non misure validate per esperimenti di timing preciso.
+
+### Area ricercatore
+
+Aprire l'app in un'altra scheda con `?researcher=1`. Configurare una password privata in **Settings → Secrets** su Streamlit Cloud:
 
 ```toml
 researcher_password = "SOSTITUISCI_CON_UNA_PASSWORD_PRIVATA"
 ```
 
-Non inserire la password nell'indirizzo, in chat o in GitHub. Per lo sviluppo locale si può usare `.streamlit/secrets.toml` (escluso da Git) oppure la variabile d'ambiente `INSTALAB_RESEARCHER_PASSWORD`, che ha precedenza sui Secrets. Non esiste una password predefinita e, in assenza di configurazione, la sezione non legge il database. L'accesso vale per la sessione del browser; **Esci dall'area ricercatore** lo termina e una modifica della password richiede un nuovo accesso. Cinque tentativi errati bloccano per un minuto ulteriori tentativi nella stessa sessione.
+In locale si può usare `.streamlit/secrets.toml` (escluso da Git) oppure la variabile `INSTALAB_RESEARCHER_PASSWORD`, che ha precedenza. Non esiste una password predefinita; senza configurazione la sezione non legge il database. Non inserire password nell'indirizzo o nel repository.
 
-Dopo l'accesso:
+Dopo l'accesso, **Aggiorna dati** legge le sessioni del server. I filtri consentono di scegliere partecipante, sessioni, fase e completamento. Sono disponibili:
 
-- **Aggiorna dati** legge le sessioni attualmente presenti nel database del server, comprese quelle chiuse da altri partecipanti.
-- I filtri selezionano partecipante, sessioni, fase ed eventualmente solo sessioni con evento di riconoscimento completato.
-- **Risposte OLD/NEW (CSV)** esporta una riga per risposta con scelta, atteso, correttezza, tempo stimato e identificativi.
-- **Registro like/dislike (CSV)** include anche le rimozioni; **Reazioni finali per volto (CSV)** riporta LIKE, DISLIKE o NONE dopo una rimozione, separatamente per sessione e volto. I volti senza alcuna reazione non compaiono nel riepilogo.
-- **Registro completo (CSV)** esporta tutti gli eventi filtrati. La copia **JSON** conserva i valori originali e i metadati; nei CSV i testi interpretabili come formule dai fogli di calcolo vengono protetti con un apostrofo.
+- **Risposte OLD/NEW (CSV)**: una riga per risposta, con metadati dello stimolo e valutazione.
+- **Registro like/dislike (CSV)**: reazioni e rimozioni.
+- **Reazioni finali per volto (CSV)**: LIKE, DISLIKE o NONE per ogni volto su cui è stata espressa almeno una reazione.
+- **Registro completo (CSV/JSON)**: tutti gli eventi filtrati; il JSON mantiene i metadati strutturati. I CSV proteggono i testi interpretabili come formule dai fogli di calcolo.
 
-L'anteprima a schermo è limitata a 500 risposte di memoria; i download includono tutte le righe filtrate. I download non modificano i dati. Il database non viene caricato da GitHub e non si recuperano database persi durante precedenti redeploy. La sezione di esportazione non sostituisce lo storage persistente e i backup necessari per uno studio reale.
+L'anteprima della memoria mostra al massimo 500 righe, mentre i download includono tutte le righe filtrate. **Esci dall'area ricercatore** termina l'accesso per quella sessione del browser. Il parametro precedente `?preview=1` è un pannello di sviluppo della singola sessione, non sostituisce l'area ricercatore protetta.
 
-### Cancellare le sessioni di prova
+### Eliminare sessioni di prova
 
-Nell'Area ricercatore autenticata aprire **Elimina sessioni di prova**. Selezionare le singole sessioni (la data è nell'orario di Roma), oppure usare **Seleziona tutte le sessioni mostrate** per sceglierle esplicitamente tutte. Senza selezione il pulsante è disabilitato. Le sessioni con lo stesso `participant_id`, incluso `DEMO_SESSION`, restano indipendenti.
+Nell'area autenticata aprire **Elimina sessioni di prova**, selezionare gli ID desiderati e premere **Elimina le sessioni selezionate**. La conferma mostra sessioni ed eventi interessati e permette un backup JSON oppure l'annullamento. Per procedere occorre scrivere **ELIMINA** e premere **Elimina definitivamente**.
 
-**Elimina le sessioni selezionate** apre una conferma con gli ID, il numero di sessioni e il numero di eventi interessati. È possibile scaricare una copia JSON oppure annullare. Per cancellare occorre scrivere **ELIMINA** e premere **Elimina definitivamente**. La cancellazione rimuove l'intera sessione (consenso, piano, feed e memoria), anche se il filtro principale mostra una sola fase. Non è disponibile un annullamento successivo nell'app; le copie già scaricate non vengono cancellate.
+Viene eliminata l'intera sessione, comprese entrambe le fasi. Non esiste un ripristino nell'app e le copie già esportate restano esterne. L'operazione è atomica. Il database conserva ID e orario di cancellazione, senza risposte, per impedire a schede aperte o reinvii ritardati di ricreare la sessione. Una sessione eliminata viene fermata al successivo aggiornamento.
 
-L'operazione è atomica e riguarda soltanto gli ID selezionati. Il database conserva solo ID e orario di cancellazione nella tabella `deleted_sessions` per impedire che ritardi di rete o schede ancora aperte ricreino le risposte eliminate. Non conserva lì le risposte. Una sessione cancellata viene fermata al successivo aggiornamento; per una nuova prova si ricarica la pagina. L'autenticazione viene verificata nuovamente nella conferma di cancellazione.
+## Registrazione e conservazione
 
-## Fase di memoria OLD/NEW
+Gli eventi vengono salvati in `.local-data/events.sqlite3`, escluso da Git. `INSTALAB_DB_PATH` permette di scegliere un altro percorso sul server. I reinvii dello stesso evento non creano duplicati; sessioni senza PID hanno ID distinti. Un errore di scrittura viene segnalato con la possibilità di riprovare.
 
-La pagina iniziale non anticipa il compito di memoria. Dopo aver scorso i 20 volti del feed con like/dislike, il pulsante **Continua** apre le istruzioni del riconoscimento. Il pulsante è disponibile quando le 20 visualizzazioni sono state registrate sul server: immagine caricata e almeno il 60% dello spazio disponibile per la fotografia visibile (altezza della fotografia oppure del viewport, se inferiore). Il conteggio non richiede di mostrare il 60% di un intero post, che potrebbe essere impossibile su finestre basse. Il contatore a fine feed indica le visualizzazioni già confermate dal server; se manca un volto, **Mostra il prossimo volto da visualizzare** lo riporta al centro dello schermo. Il tracciamento viene ricollegato dopo like, commenti e chiusura dei popup. Non è necessario mettere una reazione a ogni post.
+Il file SQLite rimane dopo un riavvio solo se il disco resta disponibile. Il disco effimero di Streamlit Community Cloud non garantisce la conservazione dopo ricreazioni o redeploy. Per una raccolta reale occorre configurare storage durevole e backup. Nessuna anonimizzazione, durata di conservazione o approvazione etica viene dichiarata come già configurata. Completare le informazioni nel consenso, le condizioni di utilizzo degli stimoli e la validazione del protocollo prima del reclutamento.
 
-Da **Inizia il riconoscimento** si passa a 20 prove, una fotografia per volta, con lo stesso stile del feed e due pulsanti al posto delle reazioni:
+## Codice e controlli
 
-- **OLD — Già visto**: volto presente nel feed precedente.
-- **NEW — Nuovo**: volto non presente nel feed precedente.
+- `app.py`: consenso, sessione, fasi e collegamento al componente.
+- `stimulus_catalog.py`: lettura, validazione e selezione dal manifest.
+- `validate_stimuli.py`: controllo del catalogo da terminale.
+- `recognition.py`: piano OLD/NEW e valutazione delle risposte.
+- `experiment_protocol.py`: quote e versione del protocollo condivise da selezione e riconoscimento.
+- `event_store.py`, `export_data.py`, `research_dashboard.py`: salvataggio, export e gestione ricercatore.
+- `feed.js`, `styles.css`: interfaccia e interazioni.
+- `image_assets.py`: derivate WebP in memoria (qualità 92, lato massimo 960 px), orientamento EXIF e cache; originali invariati. Prima presentazione e OLD usano la stessa derivata.
 
-Per sessione vengono estratti casualmente 10 OLD dai 20 volti della prima fase (5 reali e 5 sintetici), mescolati con 10 NEW (5 reali e 5 sintetici) definiti in `recognition_new_posts` in `posts.json`. I NEW non vengono mostrati né precaricati nella prima fase. Il piano viene fissato e salvato all'avvio della sessione. Gli ID delle prove visualizzati nel browser non indicano OLD/NEW e non si riutilizzano nomi, commenti o conteggi del feed come indizi di riconoscimento.
+Il browser riceve nel feed solo le 30 immagini selezionate e nel riconoscimento la prova attuale con precaricamento delle due successive. I NEW non vengono inviati nella prima fase. Le immagini decodificate vengono mantenute durante gli aggiornamenti. Un errore abilita **Riprova caricamento** e impedisce risposte su un'immagine non caricata.
 
-Ogni prova accetta una sola scelta. La prova successiva compare dopo il salvataggio; non viene mostrato un feedback di correttezza. Le risposte e l'evento di completamento usano lo stesso database e la stessa sessione/PID della prima fase. La confidenza non è implementata.
+```sh
+python -m unittest discover -s tests
+```
 
-Negli export CSV sono presenti `phase`, `trial_id`, `response`, `target`, `correct`, `response_time_ms` e `displayed_client_ts`, oltre a post, stimolo e timestamp server. La correttezza viene calcolata dal server rispetto al piano di presentazione. Il tempo di risposta è una stima nel browser dal caricamento/visualizzazione dell'immagine al clic, non una misura validata per esperimenti di timing preciso; include eventuali interruzioni o schede in background. L'app non garantisce persistenza della sessione del browser dopo refresh o chiusura, né ripresa autenticata dal PID.
+I controlli browser facoltativi richiedono Playwright e Chromium: `python tests/browser_continue.py` e `python tests/browser_images.py`. La variabile `CHROMIUM_PATH` può indicare un eseguibile diverso.
 
-È un protocollo provvisorio: proporzioni, bilanciamento, definizione di esposizione, tempi e familiarità delle fotografie vanno validati prima del reclutamento. Le istruzioni non dichiarano autorizzazioni etiche, durate o condizioni di conservazione non configurate.
-
-## Controlli di sviluppo
-
-Eseguire `python -m unittest discover -s tests`. Con Playwright e Chromium disponibili, `python tests/browser_continue.py` verifica il tracciamento su finestre basse, dopo like/commenti, il recupero dei volti mancanti e il segnale di Continua. `CHROMIUM_PATH` può indicare un eseguibile Chromium diverso.
-
-## Caricamento delle immagini
-
-Gli originali rimangono invariati. `image_assets.py` genera in memoria versioni WebP di visualizzazione (qualità 92, lato massimo 960 px, orientamento EXIF rispettato), con cache limitata e invalidata quando il file cambia. I riquadri sintetici vengono ritagliati dal foglio sorgente sul server: il browser riceve singoli volti, senza dover ridimensionare e mascherare un foglio da 3664×1951 pixel in ogni post. Si applica lo stesso percorso di preparazione ai volti reali e sintetici; OLD e prima fase usano la stessa derivata. La compressione e le dimensioni di questa demo vanno validate per l'uso sperimentale.
-
-Nel campione corrente le immagini del feed passano da circa 6,7 MB di sorgenti uniche a 1,4 MB di derivate (prima della codifica base64). Il tempo effettivo dipende da connessione e dispositivo; la prima preparazione sul server richiede più tempo di quelle successive già in cache.
-
-Il feed avvia il caricamento di tutti i 20 volti; il riconoscimento precarica solo i due volti successivi della seconda fase. Gli aggiornamenti del feed mantengono gli elementi immagine già decodificati. Un errore mostra **Riprova caricamento** e blocca le reazioni finché l'immagine non è disponibile. Le visualizzazioni e il tempo di risposta al riconoscimento iniziano solo dopo la decodifica.
-
-`image_position` in `posts.json` corregge l'inquadratura nel riquadro quadrato: per alcune fotografie verticali è impostato `center top`, così il volto non viene tagliato dal centraggio sul busto. La stessa impostazione vale per l'eventuale ripresentazione OLD.
-
-Con Playwright e Pillow nello stesso runtime, `python tests/browser_images.py` controlla tutti i volti, scorrimenti ripetuti, conservazione degli elementi immagine attraverso aggiornamenti, e recupero da un errore di decodifica simulato. L'anteprima HTML include le stesse immagini ottimizzate; il salvataggio degli eventi resta disponibile solo tramite Streamlit.
+I vecchi contenuti dimostrativi, la configurazione JSON sostituita dal manifest, le anteprime statiche e i file di sistema macOS sono stati rimossi. Test automatici, immagini del nuovo catalogo e dati raccolti vengono conservati. Le rimozioni non cancellano la cronologia Git; per pubblicare le modifiche occorre un successivo commit e push esplicitamente richiesto.

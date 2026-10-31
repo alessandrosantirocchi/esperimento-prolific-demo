@@ -8,18 +8,20 @@ cannot hide a disconnected impression observer.
 import base64
 import json
 import os
+from io import BytesIO
 from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
+from PIL import Image
 
 BASE = Path(__file__).resolve().parents[1]
 
 
 def run():
-    image = "data:image/jpeg;base64," + base64.b64encode((BASE / "stimuli/face_01.jpg").read_bytes()).decode()
-    posts = [{**post, "image_url": image} for post in json.loads((BASE / "posts.json").read_text())["posts"][:3]]
-    for post in posts:
-        post.pop("image_region", None)
+    fixture = BytesIO()
+    Image.new("RGB", (32, 32), "#8a9bad").save(fixture, "PNG")
+    image = "data:image/png;base64," + base64.b64encode(fixture.getvalue()).decode()
+    posts = [{"id":f"P{i:03}", "image_url": image, "username":f"profilo.{i}", "comments":[]} for i in range(1,4)]
     data = {"posts": posts, "phase": "feed", "history": [], "phase1_ready": False,
             "missing_post_ids": [p["id"] for p in posts]}
     css = (BASE / "styles.css").read_text().replace(":host {", "body {", 1)

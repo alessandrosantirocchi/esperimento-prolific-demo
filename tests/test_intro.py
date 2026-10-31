@@ -1,13 +1,15 @@
 """Run with: python -m unittest discover -s tests."""
 
 import unittest
-import json
 import sqlite3
+import tempfile
 from unittest.mock import patch
 from datetime import datetime
 from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
+from catalog_fixture import create_catalog
+from stimulus_catalog import load_catalog, select_sets
 
 
 APP = Path(__file__).resolve().parents[1] / "app.py"
@@ -15,6 +17,12 @@ APP = Path(__file__).resolve().parents[1] / "app.py"
 
 class IntroductionTests(unittest.TestCase):
     def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.catalog = load_catalog(create_catalog(folder.name))
+        catalog = patch("stimulus_catalog.load_catalog", return_value=self.catalog)
+        catalog.start()
+        self.addCleanup(catalog.stop)
         storage = patch("event_store.save_events")
         self.storage = storage.start()
         self.addCleanup(storage.stop)
@@ -51,7 +59,9 @@ class IntroductionTests(unittest.TestCase):
         self.assertIsNotNone(datetime.fromisoformat(timestamp).tzinfo)
         self.assertIn("feed_events", app.session_state)
         order = list(app.session_state["feed_post_order"])
-        self.assertCountEqual(order, [f"P{i:03}" for i in range(1, 21)])
+        self.assertCountEqual(order, app.session_state["stimulus_selection"]["feed"])
+        self.assertEqual(len(order), 30)
+        self.assertEqual(len(app.session_state["recognition_plan"]), 60)
         app.run()
         self.assertFalse(app.exception)
         self.assertEqual(len(app.checkbox), 0)
@@ -61,16 +71,23 @@ class IntroductionTests(unittest.TestCase):
         self.assertEqual(len(assignments), 1)
         self.assertEqual(assignments[0]["details"]["recognition_plan"], app.session_state["recognition_plan"])
 
-    def test_provisional_stimuli_are_balanced_and_available(self):
-        posts = json.loads((APP.parent / "posts.json").read_text())["posts"]
-        self.assertEqual(len(posts), 20)
-        self.assertEqual(sum(p["stimulus_type"] == "real" for p in posts), 10)
-        self.assertEqual(sum(p["stimulus_type"] == "deepfake" for p in posts), 10)
-        self.assertEqual(len({p["stimulus_id"] for p in posts}), 20)
-        for post in posts:
-            self.assertTrue((APP.parent / post["image"]).is_file())
-        regions = [tuple(p["image_region"].values()) for p in posts if "image_region" in p]
-        self.assertEqual(len(set(regions)), 10)
+    def test_catalog_reserves_distinct_new_faces(self):
+        selection = select_sets(self.catalog)
+        self.assertEqual(len(selection["feed"]), 30)
+        self.assertEqual(len(selection["new"]), 30)
+        self.assertFalse(set(selection["feed"]) & set(selection["new"]))
+
+    def test_previous_protocol_session_stops_before_adding_new_events(self):
+        app = AppTest.from_file(str(APP)).run()
+        app.checkbox[0].check().run()
+        app.button[0].click().run()
+        calls = self.storage.call_count
+        app.session_state["stimulus_selection"] = {**app.session_state["stimulus_selection"],
+                                                  "protocol_version": "previous-protocol"}
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertIn("configurazione dello studio è cambiata", app.error[0].value)
+        self.assertEqual(self.storage.call_count, calls)
 
     def test_failed_storage_is_reported_and_can_be_retried(self):
         self.storage.side_effect = sqlite3.OperationalError("database is locked")

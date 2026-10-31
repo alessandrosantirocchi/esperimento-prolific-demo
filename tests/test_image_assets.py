@@ -1,6 +1,5 @@
 import base64
 from io import BytesIO
-import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -8,14 +7,17 @@ import unittest
 from PIL import Image
 
 from image_assets import prepare_image
+from stimulus_catalog import load_catalog, select_sets
+import random
 
 BASE = Path(__file__).resolve().parents[1]
 
 
 class ImageAssetTests(unittest.TestCase):
     def test_all_display_stimuli_decode_and_are_smaller(self):
-        study = json.loads((BASE / "posts.json").read_text())
-        posts = study["posts"] + study["recognition_new_posts"]
+        catalog = load_catalog(BASE)
+        selection = select_sets(catalog, random.Random(42))
+        posts = [p for p in catalog.records if p["id"] in selection["feed"] + selection["new"]]
         sources = {p["image"] for p in posts}
         originals = {name: (BASE / name).read_bytes() for name in sources}
         assets = []

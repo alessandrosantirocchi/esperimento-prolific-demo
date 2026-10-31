@@ -226,7 +226,9 @@ def render_dashboard():
     for event in memory[:500]:
         details = event.get("details", {})
         table.append({"Partecipante": event.get("participant_id", ""), "Sessione": event["session_id"],
-                      "Stimolo": event.get("stimulus_id", ""), "Risposta": details.get("response", ""),
+                      "Stimolo": event.get("stimulus_id", ""), "File": event.get("filename", ""),
+                      "Categoria": event.get("source_type", ""), "Genere": event.get("gender", ""),
+                      "Risposta": details.get("response", ""),
                       "Atteso": details.get("target", ""), "Corretta": details.get("correct", ""),
                       "Tempo stimato (ms)": details.get("response_time_ms", ""),
                       "Ricevuta dal server (UTC)": event.get("server_received_ts", "")})

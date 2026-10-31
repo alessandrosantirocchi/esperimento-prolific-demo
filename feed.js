@@ -1,4 +1,4 @@
-// InstaLab — social feed simulator. Edit posts.json to replace stimuli.
+// InstaLab — social feed simulator. Stimuli come from stimuli.csv and images/.
 // No real Instagram API, accounts, or external communication.
 export default function (component) {
   const { parentElement, data, setStateValue } = component;
