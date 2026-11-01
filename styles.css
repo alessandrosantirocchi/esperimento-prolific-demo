@@ -164,4 +164,40 @@ svg {display:block;flex:none;}
 .recognition-actions button:disabled {cursor:default;}
 .recognition-status {font-size:13px;line-height:1.6;color:#5b6470;min-height:42px;}
 @media(max-width:715px){.recognition-area {padding:20px 12px;}.recognition-heading h1 {font-size:21px;}}
+/* Approved clean feed. Scope these refinements to phase 1, preserving the
+   recognition layout and the existing photo dimensions/crop in both phases. */
+#instalab-root.feed-mode .feed-area {padding-top:16px;}
+#instalab-root.feed-mode .post-list {gap:20px;}
+#instalab-root.feed-mode .post {padding-bottom:16px;margin-bottom:0;border-bottom-color:#ededed;}
+#instalab-root.feed-mode .post-header {height:56px;gap:10px;padding:0 0 10px;}
+#instalab-root.feed-mode .avatar-fallback {width:32px;height:32px;background:#fafafa;color:#858585;border:1px solid #e9e9e9;}
+#instalab-root.feed-mode .username-link {font-size:14px;font-weight:600;}
+#instalab-root.feed-mode .username-link:hover {color:inherit;}
+#instalab-root.feed-mode .time-small,
+#instalab-root.feed-mode .time-dot {font-size:13px;color:#737373;}
+#instalab-root.feed-mode .post-actions {margin:3px -8px 0;}
+#instalab-root.feed-mode .post-actions-left {gap:0;}
+#instalab-root.feed-mode .icon-button {width:44px;height:44px;padding:10px;transition:color .12s,transform .12s;}
+#instalab-root.feed-mode .icon-button svg {width:24px;height:24px;stroke-width:1.8;}
+#instalab-root.feed-mode .icon-button:hover {transform:none;color:inherit;}
+#instalab-root.feed-mode .icon-button:active {transform:scale(.94);}
+#instalab-root.feed-mode .icon-button.liked,
+#instalab-root.feed-mode .icon-button.liked:hover {color:#ff3040;}
+#instalab-root.feed-mode [data-action="dislike"][aria-pressed="true"] {color:#262626;}
+#instalab-root.feed-mode [data-action="dislike"][aria-pressed="true"] svg {fill:currentColor;}
+#instalab-root.feed-mode .post-body {font-size:14px;line-height:1.45;}
+#instalab-root.feed-mode .comments-preview:empty {display:none;}
+#instalab-root.feed-mode .comment-form {margin-top:0;min-height:38px;gap:12px;}
+#instalab-root.feed-mode .comment-form input {padding:8px 0;font-size:14px;}
+#instalab-root.feed-mode .comment-form input:placeholder-shown+.submit-comment {visibility:hidden;}
+#instalab-root.feed-mode .submit-comment {font-size:13px;font-weight:600;}
+#instalab-root.feed-mode .comment-line {margin:1px 0;}
+@media(max-width:715px){
+  #instalab-root.feed-mode .feed-area {padding:0;}
+  #instalab-root.feed-mode .post-list {gap:10px;}
+  #instalab-root.feed-mode .post {padding-bottom:10px;}
+  #instalab-root.feed-mode .post-header {padding:8px 12px;height:56px;}
+  #instalab-root.feed-mode .post-actions {margin:0 4px;}
+  #instalab-root.feed-mode .post-body {margin:0 14px;padding:0;}
+}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important;}}

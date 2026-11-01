@@ -10,6 +10,8 @@ L'esposizione termina quando viene meno una delle condizioni: scrolling sotto so
 
 Questo criterio è indipendente da `post_impression`, che mantiene la regola preesistente del 60% dello spazio disponibile per abilitare Continua. Le impressioni non vengono convertite in tempi di visualizzazione. Uno zero nelle nuove durate non implica necessariamente che il partecipante non abbia mai visto una parte del volto.
 
+I timer sono indipendenti per post: se due fotografie raggiungono contemporaneamente il 75%, entrambe accumulano tempo. La somma delle durate di post diversi può quindi superare la durata della fase. Il layout compatto `clean-feed-v2`, registrato in `session_started.details.feed_interface_version`, elimina righe vuote e conteggi pubblici mantenendo le dimensioni dei volti; cambia quanto dei post adiacenti può entrare nella viewport. La versione grafica va considerata quando si confrontano raccolte precedenti e successive.
+
 Il clock usa `performance.now()`, monotono nel documento. Scrolling e ridimensionamento vengono osservati tramite eventi e IntersectionObserver; si controllano anche focus, visibilità del documento e viewport visiva mobile. Non si tratta di eye tracking né di una misura validata dell'attenzione.
 
 ## Esposizioni, checkpoint e rerun
@@ -67,6 +69,8 @@ Gli stati finali sono calcolati dagli eventi della Fase 1, in ordine di registra
 | `interaction_count` | Numero complessivo di azioni social distinte |
 
 Ogni azione social ha un `action_id`. Se un clic su Dislike rimuove il Like, si mantengono entrambi gli eventi, ma si conta una sola azione in `interaction_count`. Il doppio clic sull'immagine conta un'attivazione Like solo quando cambia lo stato. Aperture dei commenti, invii, salvataggi/rimozioni e reazioni/rimozioni sono azioni; impressioni, checkpoint, retry dell'immagine e navigazione non lo sono. Negli eventi storici senza action_id si usa l'ID dell'evento e non si tenta di ricostruire raggruppamenti assenti.
+
+Una bozza di commento sopravvive ai rerun in memoria, con focus e cursore ripristinati. La digitazione non invia eventi né testo al database. Solo l'invio effettivo genera `comment_submit`; nascondere i conteggi pubblici nella grafica non modifica i conteggi negli export.
 
 ### Identificativi e categoria
 

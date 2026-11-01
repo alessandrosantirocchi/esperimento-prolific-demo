@@ -47,8 +47,14 @@ def run():
                     page.wait_for_timeout(16)
             page.locator('[data-action="like"]').first.click()
             form = page.locator('form[data-comment-post]').first
+            expect(form.locator('button')).to_be_hidden()
             form.locator('input').fill('Verifica caricamento')
+            page.evaluate('window.mount();window.mount()')
+            expect(form.locator('input')).to_have_value('Verifica caricamento')
+            expect(form.locator('input')).to_be_focused()
+            assert page.evaluate('window.events.filter(e=>e.event_type==="comment_submit").length===0')
             form.locator('button').click()
+            expect(form.locator('input')).to_have_value('')
             page.evaluate('window.hostData.image_sources={};window.mount();window.mount()')
             assert page.evaluate('window.originalImages.every((image,index)=>image===document.querySelectorAll(".post-photo")[index] && image.dataset.decoded==="true")')
             assert page.locator('.image-load-status:not([hidden])').count() == 0

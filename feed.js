@@ -15,6 +15,7 @@ export default function (component) {
   const posts = Array.isArray(data?.posts) ? data.posts.map(p=>({...p,image_url:p.image_url || sources[p.image_key] || ''})) : [];
   const stories = Array.isArray(data?.stories) ? data.stories : [];
   const recognition = data?.phase === 'recognition';
+  root.classList.toggle('feed-mode', !recognition);
   const phaseToken = `${data?.phase || 'feed'}:${recognition ? posts[0]?.id : ''}`;
   const escape = (v) => String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
   const shorten = (n) => new Intl.NumberFormat('it-IT').format(n);
@@ -26,6 +27,7 @@ export default function (component) {
       reels: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 5l4 5M16 5l4 5M10 13l5 3-5 3z"/>',
       message: '<path d="M21 3 3 10l7.5 2.4L13 20l8-17z"/><path d="m10.5 12.4 10.5-9.4"/>',
       heart: '<path d="M20.8 4.6a5.4 5.4 0 0 0-7.7 0L12 5.7l-1.1-1.1a5.4 5.4 0 0 0-7.7 7.7L12 21l8.8-8.7a5.4 5.4 0 0 0 0-7.7z"/>',
+      thumb_down: '<path d="M17 3h4v11h-4zM17 13l-5 8h-1a2 2 0 0 1-2-2l1-5H5a2 2 0 0 1-2-2l1-7a2 2 0 0 1 2-2h11z"/>',
       plus: '<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M12 7v10M7 12h10"/>',
       menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
       comment: '<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9.4 9.4 0 0 1-4-.9L3 21l1.9-5.5A8.5 8.5 0 1 1 21 11.5z"/>',
@@ -71,6 +73,8 @@ export default function (component) {
     root.__instalab_state = s;
   }
   s.disliked ||= new Set();
+  s.commentDrafts ||= {};
+  if(!recognition)s.tab='home';
 
   let observer;
   let socialActionId = null;
@@ -118,8 +122,8 @@ export default function (component) {
     const imageStyle = region ? `position:absolute;max-width:none;width:${region.source_width/region.width*100}%;height:auto;left:${-region.x/region.width*100}%;top:${-region.y/region.height*100}%;` : `object-position:${escape(p.image_position || 'center')};`;
     return `<article class="post" data-post="${escape(p.id)}">
        <header class="post-header">
-         <button class="avatar-button" data-action="profile" data-user="${escape(p.username)}">${profileAvatar(p.avatar_url)}</button>
-         <div class="post-header-main"><div class="post-name-row"><button class="username-link" data-action="profile" data-user="${escape(p.username)}">${escape(p.username)}</button>${p.verified?'<span class="verified" aria-label="Account verificato">✓</span>':''}<span class="time-dot">·</span><span class="time-small">${timeLabel(Number(p.minutes_ago)||42)}</span></div><div class="post-location">${escape(p.location || '')}</div></div>
+         <span class="avatar-button">${profileAvatar(p.avatar_url)}</span>
+         <div class="post-header-main"><div class="post-name-row"><span class="username-link">${escape(p.username)}</span>${p.verified?'<span class="verified" aria-label="Account verificato">✓</span>':''}<span class="time-dot">·</span><span class="time-small">${timeLabel(Number(p.minutes_ago)||42)}</span></div>${p.location?`<div class="post-location">${escape(p.location)}</div>`:''}</div>
          <button class="icon-button options" data-action="post_more" data-post="${escape(p.id)}" aria-label="Opzioni">${ico('more')}</button>
        </header>
        <div class="photo-wrap" data-doublepost="${escape(p.id)}">
@@ -130,17 +134,16 @@ export default function (component) {
        <div class="post-actions">
          <div class="post-actions-left">
            <button class="icon-button ${isLiked?'liked':''}" data-action="like" data-post="${escape(p.id)}" aria-label="${isLiked?'Rimuovi mi piace':'Mi piace'}" aria-pressed="${isLiked}" disabled>${ico('heart',isLiked,28)}</button>
-           <button class="icon-button" data-action="dislike" data-post="${escape(p.id)}" aria-label="${s.disliked.has(p.id)?'Rimuovi dislike':'Dislike'}" aria-pressed="${s.disliked.has(p.id)}" disabled><span aria-hidden="true">👎</span></button>
            <button class="icon-button" data-action="open_comments" data-post="${escape(p.id)}" aria-label="Commenta">${ico('comment',false,27)}</button>
+           <button class="icon-button" data-action="dislike" data-post="${escape(p.id)}" aria-label="${s.disliked.has(p.id)?'Rimuovi dislike':'Dislike'}" aria-pressed="${s.disliked.has(p.id)}" disabled>${ico('thumb_down',false,27)}</button>
          </div>
          <button class="icon-button ${isSaved?'saved':''}" data-action="save" data-post="${escape(p.id)}" aria-label="${isSaved?'Rimuovi dai salvati':'Salva'}" aria-pressed="${isSaved}">${ico('bookmark',isSaved,27)}</button>
        </div>
        <div class="post-body">
-         <div class="likes"><strong>${shorten((Number(p.initial_likes)||0)+(isLiked?1:0))} Mi piace</strong></div>
-         <div class="caption-line"><strong>${escape(p.username)}</strong> ${escape(p.caption)}</div>
+         ${p.caption?`<div class="caption-line">${escape(p.caption)}</div>`:''}
          ${list.length>2&&!s.expanded.has(p.id)?`<button class="muted-link" data-action="expand" data-post="${escape(p.id)}">Visualizza tutti i ${list.length} commenti</button>`:''}
          <div class="comments-preview">${shown.map(eachComment).join('')}</div>
-         <form class="comment-form" data-comment-post="${escape(p.id)}"><input type="text" maxlength="280" placeholder="Aggiungi un commento..." aria-label="Scrivi un commento" autocomplete="off" /><button type="submit" class="submit-comment">Pubblica</button></form>
+         <form class="comment-form" data-comment-post="${escape(p.id)}"><input type="text" maxlength="280" placeholder="Aggiungi un commento..." aria-label="Scrivi un commento" autocomplete="off" value="${escape(s.commentDrafts[p.id] || '')}" /><button type="submit" class="submit-comment">Pubblica</button></form>
        </div>
      </article>`;
   };
@@ -155,7 +158,7 @@ export default function (component) {
         <p class="recognition-status" aria-live="polite">${s.choice?'Risposta selezionata. Salvataggio in corso…':'Scegli OLD se hai visto il volto nel feed precedente, NEW se è nuovo.'}</p>
       </article></main></div>`;
   };
-  const home = () => `<div class="feed-area"><main class="timeline">${storyList()}<div class="post-list">${posts.map(post).join('')}</div><div class="end-feed"><div class="end-check">${ico('check')}</div><strong>Hai raggiunto la fine del feed</strong>${data?.phase==='feed'?`<span class="feed-progress" aria-live="polite">Volti visualizzati: ${posts.length-(data.missing_post_ids?.length ?? posts.length)} di ${posts.length}</span><span>${data.phase1_ready?'Puoi proseguire.':'Manca la visualizzazione di alcuni volti o il loro salvataggio è ancora in corso.'}</span>${!data.phase1_ready && data.missing_post_ids?.length?'<button class="review-unseen" data-action="review_unseen">Mostra il prossimo volto da visualizzare</button>':''}<button class="phase-next" data-action="begin_recognition" ${data.phase1_ready?'':'disabled'}>Continua</button>`:'<span>Fine dell’anteprima del feed.</span>'}</div></main></div>`;
+  const home = () => `<div class="feed-area"><main class="timeline"><div class="post-list">${posts.map(post).join('')}</div><div class="end-feed"><div class="end-check">${ico('check')}</div><strong>Hai raggiunto la fine del feed</strong>${data?.phase==='feed'?`<span class="feed-progress" aria-live="polite">Volti visualizzati: ${posts.length-(data.missing_post_ids?.length ?? posts.length)} di ${posts.length}</span><span>${data.phase1_ready?'Puoi proseguire.':'Manca la visualizzazione di alcuni volti o il loro salvataggio è ancora in corso.'}</span>${!data.phase1_ready && data.missing_post_ids?.length?'<button class="review-unseen" data-action="review_unseen">Mostra il prossimo volto da visualizzare</button>':''}<button class="phase-next" data-action="begin_recognition" ${data.phase1_ready?'':'disabled'}>Continua</button>`:'<span>Fine dell’anteprima del feed.</span>'}</div></main></div>`;
   const explore = (savedOnly=false) => `<section class="other-page"><header class="other-header"><h2>${savedOnly?'Elementi salvati':'Esplora'}</h2><p>${savedOnly?'I post che hai salvato':'Scopri i post della simulazione'}</p></header><div class="explore-grid">${posts.filter(p=>!savedOnly||s.saved.has(p.id)).map(p=>`<button class="explore-tile" data-action="open_post" data-post="${escape(p.id)}"><img src="${escape(p.image_url)}" alt=""/><span>${ico('heart',true,18)} ${shorten(Number(p.initial_likes)||0)}</span></button>`).join('')||'<div class="empty-state">Non hai ancora salvato nessun post.</div>'}</div></section>`;
   const search = () => `<section class="other-page"><header class="other-header"><h2>Cerca</h2><p>Cerca profili e post dimostrativi</p></header><div class="search-box">${ico('search')}<input autofocus class="search-input" type="search" placeholder="Cerca" value="${escape(s.query)}" aria-label="Cerca nel feed" /></div><div class="search-results">${posts.filter(p=>p.username.toLowerCase().includes(s.query.toLowerCase())||p.caption.toLowerCase().includes(s.query.toLowerCase())).map(p=>`<button class="search-result" data-action="open_post" data-post="${escape(p.id)}">${profileAvatar(p.avatar_url)}<span><strong>${escape(p.username)}</strong><small>${escape(p.location)}</small></span>${ico('chevron',false,18)}</button>`).join('')}</div></section>`;
   const profile = () => `<section class="other-page profile-page"><div class="profile-header"><span class="large-avatar">${ico('profile',false,48)}</span><div><div class="profile-username">you.research <span class="demo-tag">Account demo</span></div><div class="profile-stats"><span><strong>0</strong> post</span><span><strong>0</strong> follower</span><span><strong>${s.followed.size}</strong> seguiti</span></div><p>Profilo di simulazione per studi di ricerca.</p></div></div><div class="profile-tabs"><button class="active">${ico('grid',false,17)} Post</button><button data-action="nav" data-tab="saved">${ico('bookmark',false,17)} Elementi salvati</button></div><div class="empty-state">I post del feed sono esempi, non appartengono a questo profilo.</div></section>`;
@@ -239,6 +242,11 @@ export default function (component) {
   };
 
   const render = () => {
+    const active = root.getRootNode().activeElement;
+    const commentFocus = active?.matches('.comment-form input') && root.contains(active) ? {
+      post:active.closest('form').dataset.commentPost, start:active.selectionStart, end:active.selectionEnd,
+      inOverlay:!!active.closest('.overlay')
+    } : null;
     tracker?.beforeRender();
     const y=s.resetScroll?0:window.scrollY;
     s.resetScroll=false;
@@ -258,7 +266,16 @@ export default function (component) {
       if(index>=0)image.replaceWith(candidates.splice(index,1)[0]);
     });
     root.replaceChildren(template.content);
-    window.requestAnimationFrame(()=>{window.scrollTo({top:y,behavior:'instant'});tracker?.afterRender();});
+    window.requestAnimationFrame(()=>{
+      if(!root.isConnected)return;
+      window.scrollTo({top:y,behavior:'instant'});
+      if(commentFocus){
+        const inputs=root.querySelectorAll(`form[data-comment-post="${CSS.escape(commentFocus.post)}"] input`);
+        const input=[...inputs].find(e=>!!e.closest('.overlay')===commentFocus.inOverlay);
+        if(input){input.focus({preventScroll:true});input.setSelectionRange(commentFocus.start,commentFocus.end);}
+      }
+      tracker?.afterRender();
+    });
     // Like/comment/modal renders replace the photo nodes: observe the new nodes.
     if(observer) {
       observer.disconnect();
@@ -338,10 +355,13 @@ export default function (component) {
     const value=(input?.value||'').trim(); if(!value)return;
     socialActionId = feedEventId();
     (s.comments[id] ||= []).push({username:'you.research',text:value});
+    delete s.commentDrafts[id];
     signal('comment_submit',id,{text:value,length:value.length});
     render();
   };
   root.oninput = (e) => {
+    const commentForm=e.target.closest('form[data-comment-post]');
+    if(commentForm && e.target.matches('input'))s.commentDrafts[commentForm.dataset.commentPost]=e.target.value;
     if(e.target.matches('.search-input')) {
       const pos=e.target.selectionStart;
       s.query=e.target.value;

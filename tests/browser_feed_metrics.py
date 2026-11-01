@@ -50,8 +50,8 @@ def run():
                     durations[d["exposure_id"]] = max(durations.get(d["exposure_id"], 0), d["duration_ms"])
                 return sum(durations.values())
 
-            def show(post):
-                page.locator(f'article[data-post="{post}"] .post-photo').evaluate('(e)=>e.scrollIntoView({block:"center"})')
+            def show(post, position="center"):
+                page.locator(f'article[data-post="{post}"] .post-photo').evaluate('(e,position)=>e.scrollIntoView({block:position})', position)
                 page.evaluate(tracker + '.update()')
                 page.wait_for_timeout(70)
 
@@ -61,7 +61,9 @@ def run():
             page.wait_for_timeout(200)
             starts = [e for e in views("P1") if e["details"]["reason"] == "start"]
             assert len(starts) == 1, starts
-            show("P2")
+            # With a compact feed, centering P2 can leave part of P1 visible.
+            # Align P2 to the top to test an actually offscreen P1.
+            show("P2", position="start")
             assert page.locator('article[data-post="P1"] .post-photo').evaluate('(e)=>feedVisibleRatio(e)') == 0
             offscreen_duration = exposure_total("P1")
             assert offscreen_duration >= 350, offscreen_duration

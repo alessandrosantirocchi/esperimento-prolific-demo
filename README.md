@@ -2,6 +2,10 @@
 
 Applicazione Streamlit con un feed ispirato a Instagram, reazioni like/dislike, commenti e successivo compito di memoria OLD/NEW. Non usa account, API o dati di Instagram. Il protocollo prevede 30 volti nel feed e 60 prove di memoria, con quote uguali per categoria e genere.
 
+Il feed usa una colonna di post senza navigazione, storie o pannelli laterali. I comandi Like, commenti, Dislike e salvataggio hanno icone SVG uniformi e aree di tocco da 44 px. I conteggi pubblici dei Like sono nascosti; restano il feedback delle proprie reazioni e la registrazione degli eventi. I nomi e gli avatar simbolici nell'intestazione sono statici e non aprono pagine profilo. Le didascalie vuote e la ripetizione del nome sotto la fotografia sono eliminate.
+
+I commenti restano in linea. **Pubblica** compare quando il campo contiene testo; una bozza non inviata mantiene contenuto, focus e posizione del cursore durante i normali rerun. Le bozze rimangono nella memoria della pagina e non vengono registrate come commenti o interazioni prima dell'invio. Il layout del riconoscimento e le dimensioni/inquadrature delle fotografie restano quelli precedenti.
+
 ## Provare l'app in locale
 
 Richiede Python 3.11 o successivo. Nel terminale, dalla cartella del repository:
@@ -110,6 +114,8 @@ Il riconoscimento presenta una fotografia per volta e consente una sola risposta
 Per gli eventi riferiti a un volto e per le reazioni finali, gli export CSV/JSON includono `stimulus_id`, `filename`, `source_type` e `gender`. È mantenuta anche la colonna precedente `stimulus_type` (`real`/`deepfake`) per compatibilità con il raggruppamento binario. Gli eventi generali della sessione non hanno uno stimolo associato; le loro colonne restano vuote. I vecchi eventi salvati prima di questa modifica non vengono alterati e possono avere vuote le nuove colonne.
 
 Questi metadati, i percorsi originali e la soluzione OLD/NEW non vengono inviati al componente del partecipante. Il feed usa ID e nomi di profilo neutri e immagini incorporate. All'avvio vengono salvati sul server il consenso, l'ordine dei post, il piano di memoria, la versione del protocollo, l'impronta del catalogo e i metadati dei 60 stimoli selezionati, con hash dei file per la tracciabilità.
+
+Il campo `session_started.details.feed_interface_version` identifica la veste grafica del feed: `clean-feed-v2` per il layout compatto approvato. Le sessioni storiche possono non avere questo campo. Le definizioni delle metriche e il criterio del 75% non cambiano con questa versione.
 
 Gli export di memoria conservano anche `phase`, `trial_id`, `response`, `target`, `correct`, `response_time_ms` e `displayed_client_ts`. La correttezza viene calcolata dal server. I tempi sono stime nel browser, non misure validate per esperimenti di timing preciso.
 

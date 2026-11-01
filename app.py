@@ -26,6 +26,7 @@ from stimulus_catalog import (load_catalog, select_sets, CatalogError, METADATA_
                               display_post, public_history)
 
 BASE = Path(__file__).resolve().parent
+FEED_INTERFACE_VERSION = "clean-feed-v2"
 st.set_page_config(
     page_title="InstaLab | Social Feed Simulation",
     page_icon="📷",
@@ -558,6 +559,7 @@ try:
                         "catalog_fingerprint": catalog.fingerprint,
                         "protocol_version": PROTOCOL_VERSION,
                         "feed_tracking_version": TRACKING_VERSION,
+                        "feed_interface_version": FEED_INTERFACE_VERSION,
                         "stimuli": [{field: p[field] for field in ("id", "image", "sha256") + METADATA_FIELDS}
                                     for p in study["posts"] + study["recognition_new_posts"]]},
         })
