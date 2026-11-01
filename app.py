@@ -16,7 +16,7 @@ from pathlib import Path
 import streamlit as st
 from event_store import save_events, SessionDeletedError, is_session_deleted
 from recognition import make_plan, score_response
-from image_assets import prepare_images
+import image_assets
 from export_data import csv_bytes as export_csv
 from research_dashboard import render_dashboard
 from experiment_protocol import PROTOCOL_VERSION
@@ -65,7 +65,13 @@ def load_stimuli(catalog, selection, include_new_images=False) -> dict:
     # faces until the transition to recognition. Metadata and assignments stay
     # identical; all memory assets are ready before its first trial is shown.
     image_ids = selection["feed"] + (selection["new"] if include_new_images else [])
-    assets = dict(zip(image_ids, prepare_images([catalog.base / by_id[i]["image"] for i in image_ids])))
+    image_paths = [catalog.base / by_id[i]["image"] for i in image_ids]
+    # Streamlit can retain the older imported module during a live update.
+    # Its original single-image API remains compatible with the new app.
+    batch_loader = getattr(image_assets, "prepare_images", None)
+    images = (batch_loader(image_paths) if batch_loader is not None
+              else [image_assets.prepare_image(path) for path in image_paths])
+    assets = dict(zip(image_ids, images))
     study = {"posts": [], "recognition_new_posts": [], "stories": [], "display_name": "Social Feed"}
     for key, destination in (("feed", "posts"), ("new", "recognition_new_posts")):
         for index, identifier in enumerate(selection[key], 1):

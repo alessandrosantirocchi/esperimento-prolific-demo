@@ -6,6 +6,7 @@ import tempfile
 from unittest.mock import patch
 from datetime import datetime
 from pathlib import Path
+from types import ModuleType
 import uuid
 
 from streamlit.testing.v1 import AppTest
@@ -212,6 +213,33 @@ class IntroductionTests(unittest.TestCase):
             self.assertEqual({call.args[0] for call in image_loader.call_args_list}, paths(selection["feed"] + selection["new"]))
             self.assertEqual(app.session_state["recognition_plan"], plan)
             self.assertEqual(app.session_state["feed_post_order"], order)
+
+    def test_cached_image_module_without_batch_helper_can_run_both_phases(self):
+        legacy = ModuleType("image_assets")
+        legacy.__file__ = str(APP.with_name("image_assets.py"))
+        legacy.prepare_image = prepare_image
+        # A running Streamlit process may retain the previously imported module
+        # while rerunning the updated app.py. It has only the original API.
+        with patch.dict("sys.modules", {"image_assets": legacy}):
+            app = AppTest.from_file(str(APP)).run()
+            self.assertFalse(app.exception)
+            app.checkbox[0].check().run()
+            app.button[0].click().run()
+            self.complete_details(app)
+            self.assertFalse(app.exception)
+            self.assertEqual(len(app.session_state["feed_post_order"]), 30)
+            plan = list(app.session_state["recognition_plan"])
+            self.assertEqual(len(plan), 60)
+            app.run()
+            self.assertFalse(app.exception)
+            app.session_state["experiment_phase"] = "recognition_intro"
+            app.run()
+            self.assertFalse(app.exception)
+            self.assertEqual(app.title[0].value, "Hai già visto questo volto?")
+            app.button[0].click().run()
+            self.assertFalse(app.exception)
+            self.assertEqual(app.session_state["experiment_phase"], "recognition")
+            self.assertEqual(app.session_state["recognition_plan"], plan)
 
     def test_previous_protocol_session_stops_before_adding_new_events(self):
         app = AppTest.from_file(str(APP)).run()
