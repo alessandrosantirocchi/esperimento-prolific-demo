@@ -15,8 +15,9 @@ export default function (component) {
   const posts = Array.isArray(data?.posts) ? data.posts.map(p=>({...p,image_url:p.image_url || sources[p.image_key] || ''})) : [];
   const stories = Array.isArray(data?.stories) ? data.stories : [];
   const recognition = data?.phase === 'recognition';
+  const requiresConfidence = recognition && data?.confidence_required === true;
   root.classList.toggle('feed-mode', !recognition);
-  const phaseToken = `${data?.phase || 'feed'}:${recognition ? posts[0]?.id : ''}`;
+  const phaseToken = `${data?.phase || 'feed'}:${recognition ? posts[0]?.id : ''}${requiresConfidence?':confidence-v1':''}`;
   const escape = (v) => String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
   const shorten = (n) => new Intl.NumberFormat('it-IT').format(n);
   const ico = (name, filled=false, size=25) => {
@@ -55,7 +56,8 @@ export default function (component) {
   if (!s || s.participantId !== participantId || s.sessionId !== sessionId || s.phaseToken !== phaseToken) {
     s = { participantId, sessionId, phaseToken, tab:'home', overlay:null, overlayPost:null, storyIndex:0, query:'',
           liked:new Set(), disliked:new Set(), saved:new Set(), followed:new Set(), comments:{}, expanded:new Set(),
-          events:recovered.slice(), started:Date.now(), seen:new Set(), choice:null, shownAt:null, resetScroll:true };
+          events:recovered.slice(), started:Date.now(), seen:new Set(), choice:null, shownAt:null, resetScroll:true,
+          choiceRt:null, choiceAt:null, confidence:null, confidenceRt:null, submitted:false };
     for (const e of recovered) {
       if (e.event_type === 'like') s.liked.add(e.post_id);
       if (e.event_type === 'unlike') s.liked.delete(e.post_id);
@@ -74,6 +76,18 @@ export default function (component) {
   }
   s.disliked ||= new Set();
   s.commentDrafts ||= {};
+  s.submitted ||= false;
+  if(recognition){
+    const pending = recovered.find(e=>e.event_type==='recognition_response' &&
+      (e.post_id===posts[0]?.id || e.trial_id===posts[0]?.id));
+    if(pending){
+      s.choice=pending.details?.response || s.choice;
+      s.choiceRt=pending.details?.response_time_ms ?? s.choiceRt;
+      s.confidence=pending.details?.confidence ?? null;
+      s.confidenceRt=pending.details?.confidence_response_time_ms ?? null;
+      s.submitted=true;
+    }
+  }
   s.transitionPending ||= !recognition && recovered.some(e=>e.event_type==='begin_recognition');
   if(!recognition)s.tab='home';
 
@@ -152,11 +166,17 @@ export default function (component) {
     const r = p.image_region;
     const style = r ? `position:absolute;max-width:none;width:${r.source_width/r.width*100}%;height:auto;left:${-r.x/r.width*100}%;top:${-r.y/r.height*100}%;` : `object-position:${escape(p.image_position || 'center')};`;
     return `<div class="feed-area recognition-area"><main class="timeline">
-      <header class="recognition-heading"><span>Memoria di riconoscimento</span><h1>Hai già visto questo volto?</h1><p>Volto ${data.trial_number} di ${data.trial_total}</p></header>
+      <header class="recognition-heading"><h1>Hai già visto questo volto?</h1></header>
       <article class="post recognition-post" data-post="${escape(p.id)}">
         <div class="photo-wrap"><img class="post-photo recognition-photo" style="${style}" decoding="async" fetchpriority="high" src="${escape(p.image_url)}" alt="Volto da riconoscere" />${imageStatus(p.id)}</div>
         <div class="recognition-actions">${['OLD','NEW'].map(choice=>`<button data-action="recognition_response" data-post="${escape(p.id)}" data-choice="${choice}" aria-pressed="${s.choice===choice}" disabled><strong>${choice}</strong><span>${choice==='OLD'?'Già visto':'Nuovo'}</span></button>`).join('')}</div>
-        <p class="recognition-status" aria-live="polite">${s.choice?'Risposta selezionata. Salvataggio in corso…':'Scegli OLD se hai visto il volto nel feed precedente, NEW se è nuovo.'}</p>
+        ${requiresConfidence?`<fieldset class="recognition-confidence"><legend>Quanto sei sicuro/a della risposta?</legend>
+          <div class="confidence-options">${['Per nulla sicuro/a','Poco sicuro/a','Moderatamente sicuro/a','Molto sicuro/a','Del tutto sicuro/a'].map((label,index)=>{
+            const value=index+1;
+            return `<button type="button" data-action="recognition_confidence" data-confidence-value="${value}" aria-label="${value} — ${label}" aria-pressed="${s.confidence===value}" disabled>${value}</button>`;
+          }).join('')}</div><div class="confidence-anchors" aria-hidden="true"><span>1 · Per nulla sicuro/a</span><span>5 · Del tutto sicuro/a</span></div>
+        </fieldset>`:''}
+        <p class="recognition-status" role="status" aria-live="polite" ${s.submitted?'':'hidden'}>${s.submitted?'Salvataggio in corso…':''}</p>
       </article></main></div>`;
   };
   const home = () => `<div class="feed-area"><main class="timeline"><div class="post-list">${posts.map(post).join('')}</div><div class="end-feed"><div class="end-check">${ico('check')}</div><strong>Hai raggiunto la fine del feed</strong>${data?.phase==='feed'?`<span class="feed-progress" aria-live="polite">Volti visualizzati: ${posts.length-(data.missing_post_ids?.length ?? posts.length)} di ${posts.length}</span><span>${data.phase1_ready?'Puoi proseguire.':'Manca la visualizzazione di alcuni volti o il loro salvataggio è ancora in corso.'}</span>${!data.phase1_ready && data.missing_post_ids?.length?'<button class="review-unseen" data-action="review_unseen">Mostra il prossimo volto da visualizzare</button>':''}${s.transitionPending?'<span class="feed-transition-status" role="status" aria-live="polite">Aggiornamento del feed…</span>':''}<button class="phase-next" data-action="begin_recognition" ${data.phase1_ready&&!s.transitionPending?'':'disabled'}>Continua</button>`:'<span>Fine dell’anteprima del feed.</span>'}</div></main></div>`;
@@ -189,6 +209,12 @@ export default function (component) {
       const wrapper=image.closest('.photo-wrap');
       const status=wrapper.querySelector('.image-load-status');
       const controls=card.querySelectorAll('[data-action="like"],[data-action="dislike"],[data-action="recognition_response"]');
+      const updateRecognitionControls=()=>{
+        if(!recognition)return;
+        const ready=image.dataset.decoded==='true' && s.shownAt!==null && !s.submitted;
+        controls.forEach(button=>{button.disabled=!ready;});
+        card.querySelectorAll('[data-confidence-value]').forEach(button=>{button.disabled=!ready || !s.choice;});
+      };
       const failed=()=>{
         if(!root.contains(image))return;
         image.dataset.decoded='';
@@ -197,19 +223,21 @@ export default function (component) {
         status.querySelector('button').hidden=false;
         controls.forEach(button=>{button.disabled=true;});
         if(recognition)s.shownAt=null;
+        updateRecognitionControls();
         tracker?.update();
       };
       const decoded=()=>{
         if(!root.contains(image) || !image.naturalWidth)return;
         image.dataset.decoded='true';
         status.hidden=true;
-        controls.forEach(button=>{button.disabled=recognition && (!!s.choice || s.shownAt===null);});
+        controls.forEach(button=>{button.disabled=recognition && (s.submitted || s.shownAt===null);});
+        updateRecognitionControls();
         if(observer){observer.unobserve(wrapper);observer.observe(wrapper);}
         tracker?.update();
         if(recognition)window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{
           if(!root.contains(image))return;
           if(s.shownAt===null){s.shownAt=performance.now();s.shownAtClient=new Date().toISOString();}
-          controls.forEach(button=>{button.disabled=!!s.choice;});
+          updateRecognitionControls();
         }));
       };
       const loaded=()=>{
@@ -249,7 +277,8 @@ export default function (component) {
       inOverlay:!!active.closest('.overlay')
     } : null;
     tracker?.beforeRender();
-    const y=s.resetScroll?0:window.scrollY;
+    const resetScroll=s.resetScroll;
+    const y=resetScroll?0:window.scrollY;
     s.resetScroll=false;
     const body = recognition ? recognitionCard(posts[0]) : s.tab==='home'?home():s.tab==='explore'?explore():s.tab==='saved'?explore(true):s.tab==='search'?search():s.tab==='profile'?profile():misc(s.tab);
     // Retain decoded <img> nodes through both local and server-driven rerenders.
@@ -270,6 +299,7 @@ export default function (component) {
     window.requestAnimationFrame(()=>{
       if(!root.isConnected)return;
       window.scrollTo({top:y,behavior:'instant'});
+      if(recognition && resetScroll)root.querySelector('.recognition-heading')?.scrollIntoView({block:'start',behavior:'instant'});
       if(commentFocus){
         const inputs=root.querySelectorAll(`form[data-comment-post="${CSS.escape(commentFocus.post)}"] input`);
         const input=[...inputs].find(e=>!!e.closest('.overlay')===commentFocus.inOverlay);
@@ -283,6 +313,17 @@ export default function (component) {
       if(s.tab==='home' && !s.overlay) root.querySelectorAll('.post .photo-wrap').forEach(el=>observer.observe(el));
     }
     wireImages();
+  };
+
+  const submitRecognition = () => {
+    if(!recognition || s.submitted || !s.choice || s.choiceRt===null)return;
+    if(requiresConfidence && (!Number.isInteger(s.confidence) || s.confidence<1 || s.confidence>5))return;
+    const details={response:s.choice,response_time_ms:s.choiceRt,displayed_client_ts:s.shownAtClient};
+    if(requiresConfidence)Object.assign(details,{confidence:s.confidence,
+      confidence_response_time_ms:s.confidenceRt,confidence_scale_version:1});
+    s.submitted=true;
+    signal('recognition_response',posts[0].id,details);
+    render();
   };
 
   const perform = (btn) => {
@@ -303,10 +344,22 @@ export default function (component) {
       return;
     }
     if (recognition) {
-      if(action!=='recognition_response' || s.choice || s.shownAt===null || btn.disabled) return;
-      s.choice=btn.dataset.choice;
-      signal('recognition_response',id,{response:s.choice,response_time_ms:Math.round(performance.now()-s.shownAt),displayed_client_ts:s.shownAtClient});
-      render();return;
+      if(s.submitted || s.shownAt===null || btn.disabled)return;
+      if(action==='recognition_confidence'){
+        if(!requiresConfidence || !s.choice || s.choiceAt===null)return;
+        const value=Number(btn.dataset.confidenceValue);
+        if(!Number.isInteger(value) || value<1 || value>5)return;
+        s.confidence=value;
+        s.confidenceRt=Math.max(0,Math.round(performance.now()-s.choiceAt));
+        submitRecognition();return;
+      }
+      if(action!=='recognition_response')return;
+      if(s.choice===btn.dataset.choice)return;
+      s.choice=btn.dataset.choice;s.choiceAt=performance.now();
+      s.choiceRt=Math.max(0,Math.round(s.choiceAt-s.shownAt));
+      s.confidence=null;s.confidenceRt=null;
+      if(requiresConfidence)render();else submitRecognition();
+      return;
     }
     if(s.transitionPending)return;
     if(action==='begin_recognition') {

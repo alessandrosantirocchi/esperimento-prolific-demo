@@ -6,7 +6,7 @@ import tempfile
 from unittest.mock import patch
 from datetime import datetime
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 import uuid
 
 from streamlit.testing.v1 import AppTest
@@ -45,6 +45,25 @@ class IntroductionTests(unittest.TestCase):
             button = next((b for b in app.button if b.key == "start_feed_button"), None)
             if button:
                 button.click().run()
+
+    def start_recognition(self):
+        app = AppTest.from_file(str(APP)).run()
+        app.checkbox[0].check().run()
+        app.button[0].click().run()
+        self.complete_details(app)
+        app.session_state["experiment_phase"] = "recognition_intro"
+        app.run()
+        next(b for b in app.button if b.label == "Inizia il riconoscimento").click().run()
+        self.assertFalse(app.exception)
+        return app
+
+    def submit_recognition_event(self, app, identifier, trial, details):
+        payload = {"event_id": identifier, "event_type": "recognition_response",
+                   "post_id": trial["trial_id"], "details": details}
+        component = lambda **kwargs: SimpleNamespace(events=[payload])
+        with patch("streamlit.components.v2.component", return_value=component):
+            app.run()
+        self.assertFalse(app.exception)
 
     def test_consent_is_required_and_can_be_unchecked(self):
         app = AppTest.from_file(str(APP)).run()
@@ -345,6 +364,49 @@ class IntroductionTests(unittest.TestCase):
         self.assertEqual({e["participant_id"] for e in app.session_state["feed_events"]}, {participant})
         self.assertTrue(all(e["participant_age"] == 24 and e["participant_gender"] == "woman" for e in app.session_state["feed_events"]))
         self.assertTrue(any(e["event_type"] == "recognition_started" for e in app.session_state["feed_events"]))
+
+    def test_confidence_is_required_and_server_rejects_invalid_values(self):
+        app = self.start_recognition()
+        trial = app.session_state["recognition_plan"][0]
+        start = next(e for e in app.session_state["feed_events"] if e["event_type"] == "recognition_started")
+        self.assertEqual(start["details"]["confidence_scale_version"], 1)
+        invalid = [{"confidence": value, "confidence_response_time_ms": 200}
+                   for value in [None, 0, 6, -1, True, 2.5, "3"]]
+        invalid.extend({"confidence": 3, "confidence_response_time_ms": value}
+                       for value in [None, True, -1, "200", float("nan"), float("inf")])
+        invalid.append({})
+        for number, fields in enumerate(invalid):
+            self.submit_recognition_event(app, f"invalid-{number}", trial,
+                                          {"response": "OLD", "response_time_ms": 500, **fields})
+            self.assertFalse(any(e["event_type"] == "recognition_response" for e in app.session_state["feed_events"]))
+
+    def test_confidence_is_saved_once_with_server_scoring_and_original_trial_ids(self):
+        app = self.start_recognition()
+        plan = list(app.session_state["recognition_plan"])
+        for number, confidence in enumerate([1, 5]):
+            trial = plan[number]
+            self.submit_recognition_event(app, f"rated-{number}", trial, {
+                "response": trial["target"], "response_time_ms": 400,
+                "confidence": confidence, "confidence_response_time_ms": 750,
+                "confidence_scale_version": 999, "correct": False})
+        rows = [e for e in app.session_state["feed_events"] if e["event_type"] == "recognition_response"]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual([e["post_id"] for e in rows], [p["post_id"] for p in plan[:2]])
+        self.assertEqual([e["details"]["confidence"] for e in rows], [1, 5])
+        self.assertTrue(all(e["details"]["confidence_scale_version"] == 1 and e["details"]["correct"] for e in rows))
+        self.assertTrue(all(e["details"]["response_time_ms"] == 400 for e in rows))
+        self.assertEqual(app.session_state["recognition_plan"], plan)
+
+    def test_recognition_already_started_without_confidence_keeps_its_format(self):
+        app = self.start_recognition()
+        start = next(e for e in app.session_state["feed_events"] if e["event_type"] == "recognition_started")
+        start["details"] = {}
+        trial = app.session_state["recognition_plan"][0]
+        self.submit_recognition_event(app, "legacy-response", trial,
+                                      {"response": "OLD", "response_time_ms": 400})
+        rows = [e for e in app.session_state["feed_events"] if e["event_type"] == "recognition_response"]
+        self.assertEqual(len(rows), 1)
+        self.assertNotIn("confidence", rows[0]["details"])
 
 
 if __name__ == "__main__":

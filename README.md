@@ -107,7 +107,7 @@ La versione del protocollo viene registrata nei metadati degli eventi di avvio e
 
 Il consenso preliminare è obbligatorio. Le istruzioni di memoria appaiono dopo il feed. **Continua** diventa disponibile quando il server ha registrato tutte le visualizzazioni: fotografia decodificata e almeno il 60% dell'altezza disponibile per l'immagine visibile (il minimo tra altezza della fotografia e del viewport). **Mostra il prossimo volto da visualizzare** permette di recuperare una visualizzazione mancante. Non è obbligatoria una reazione a ogni post.
 
-Il riconoscimento presenta una fotografia per volta e consente una sola risposta OLD/NEW, senza feedback di correttezza. La prova successiva arriva dopo il salvataggio. La confidenza non è implementata. Il codice partecipante e la sessione sono gli stessi delle due parti.
+Il riconoscimento presenta una fotografia per volta: **OLD/NEW → confidenza 1–5 → passaggio automatico dopo il salvataggio**. La confidenza è obbligatoria, senza valore preselezionato: 1 significa «Per nulla sicuro/a» e 5 «Del tutto sicuro/a». OLD/NEW può essere modificato prima di scegliere la confidenza; quest'ultima invia insieme i due giudizi. Non ci sono feedback di correttezza, contatore visibile o istruzioni ripetute sotto ogni volto. Il codice partecipante e la sessione sono gli stessi delle due parti. Le sessioni il cui riconoscimento era già iniziato senza confidenza mantengono il formato precedente, evitando di cambiare procedura a metà prova; un nuovo avvio registra `recognition_started.details.confidence_scale_version=1`.
 
 ## Metadati ed esportazione
 
@@ -117,7 +117,7 @@ Questi metadati, i percorsi originali e la soluzione OLD/NEW non vengono inviati
 
 Il campo `session_started.details.feed_interface_version` identifica la veste grafica del feed: `clean-feed-v2` per il layout compatto approvato. Le sessioni storiche possono non avere questo campo. Le definizioni delle metriche e il criterio del 75% non cambiano con questa versione.
 
-Gli export di memoria conservano anche `phase`, `trial_id`, `response`, `target`, `correct`, `response_time_ms` e `displayed_client_ts`. La correttezza viene calcolata dal server. I tempi sono stime nel browser, non misure validate per esperimenti di timing preciso.
+Gli export di memoria conservano anche `phase`, `trial_id`, `response`, `target`, `correct`, `response_time_ms` e `displayed_client_ts`, e aggiungono `confidence`, `confidence_response_time_ms` e `confidence_scale_version`. `response_time_ms` misura il tempo dalla presentazione alla selezione OLD/NEW finale, prima del giudizio di confidenza; `confidence_response_time_ms` misura l'intervallo tra quella selezione e il clic sul valore 1–5. Il `client_ts` dell'evento corrisponde all'invio dopo il giudizio di confidenza. Se OLD/NEW cambia prima dell'invio, entrambi gli intervalli vengono riferiti alla nuova selezione e la confidenza viene azzerata. Il server accetta solo valori interi da 1 a 5 e tempi finiti non negativi; i dati storici senza confidenza restano vuoti, senza essere sostituiti con zero. La correttezza viene calcolata dal server. I tempi sono stime nel browser, non misure validate per esperimenti di timing preciso.
 
 ### Area ricercatore
 

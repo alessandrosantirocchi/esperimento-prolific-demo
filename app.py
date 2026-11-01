@@ -27,6 +27,7 @@ from stimulus_catalog import (load_catalog, select_sets, CatalogError, METADATA_
 
 BASE = Path(__file__).resolve().parent
 FEED_INTERFACE_VERSION = "clean-feed-v2"
+CONFIDENCE_SCALE_VERSION = 1
 st.set_page_config(
     page_title="Social Feed | Faces in the Digital Age",
     page_icon="📷",
@@ -440,12 +441,21 @@ if "experiment_phase" not in st.session_state:
     st.session_state.experiment_phase = "feed"
 
 phase = st.session_state.experiment_phase
+recognition_start = next((e for e in st.session_state.feed_events
+                          if e.get("event_type") == "recognition_started"), None)
+# Existing recognition runs finish with their original response format. New
+# starts record the confidence requirement before any recognition trial begins.
+confidence_required = (recognition_start is None or
+                       recognition_start.get("details", {}).get("confidence_scale_version") == CONFIDENCE_SCALE_VERSION)
 if phase == "recognition_intro":
     with st.container(key="recognition_info"):
         st.title("Hai già visto questo volto?")
         st.write("Ora vedrai alcuni volti del feed precedente insieme a volti nuovi. Per ogni fotografia, indica se ricordi di averla vista nella prima parte.")
         st.markdown("**OLD — Già visto:** il volto era presente nel feed precedente.\n\n**NEW — Nuovo:** il volto non era presente nel feed precedente.")
-        st.write("Scegli una sola risposta per ogni volto. Dopo la scelta passerai alla fotografia successiva. Non verrà mostrato se la risposta è corretta.")
+        if confidence_required:
+            st.write("Scegli OLD o NEW, poi indica quanto sei sicuro/a della risposta: da 1 (per nulla sicuro/a) a 5 (del tutto sicuro/a). Dopo il giudizio di sicurezza passerai automaticamente al volto successivo. Non verrà mostrato se la risposta è corretta.")
+        else:
+            st.write("Scegli una sola risposta per ogni volto. Dopo la scelta passerai alla fotografia successiva. Non verrà mostrato se la risposta è corretta.")
         # Show the instructions before any outstanding image preparation, so a
         # cold server never leaves the participant waiting at the end of the feed.
         try:
@@ -460,7 +470,8 @@ if phase == "recognition_intro":
             event = {"event_id": "recognition_started", "event_type": "recognition_started",
                      "participant_id": participant_id, "session_id": st.session_state.recording_session_id,
                      **participant_details,
-                     "phase": "recognition", "server_received_ts": datetime.now(timezone.utc).isoformat()}
+                     "phase": "recognition", "server_received_ts": datetime.now(timezone.utc).isoformat(),
+                     "details": {"confidence_scale_version": CONFIDENCE_SCALE_VERSION if confidence_required else 0}}
             try:
                 save_events(st.session_state.recording_session_id, [event])
             except SessionDeletedError:
@@ -540,6 +551,7 @@ response = feed_component(
         "missing_post_ids": missing_post_ids,
         "trial_number": len(answered_ids) + 1,
         "trial_total": len(st.session_state.recognition_plan),
+        "confidence_required": confidence_required,
         "title": study.get("display_name", "Social Feed"),
         "participant_id": participant_id,
         "session_id": st.session_state.recording_session_id,
@@ -607,6 +619,17 @@ for event in new_events:
         rt = event["details"].get("response_time_ms")
         if type(rt) not in {float, int} or not math.isfinite(rt) or rt < 0:
             continue
+        if confidence_required:
+            confidence = event["details"].get("confidence")
+            confidence_rt = event["details"].get("confidence_response_time_ms")
+            if (type(confidence) is not int or not 1 <= confidence <= 5
+                    or type(confidence_rt) not in {float, int}
+                    or not math.isfinite(confidence_rt) or confidence_rt < 0):
+                continue
+            event["details"]["confidence_scale_version"] = CONFIDENCE_SCALE_VERSION
+        else:
+            for field in ("confidence", "confidence_response_time_ms", "confidence_scale_version"):
+                event["details"].pop(field, None)
         event["trial_id"] = trial["trial_id"]
         event["post_id"] = trial["post_id"]
         try:

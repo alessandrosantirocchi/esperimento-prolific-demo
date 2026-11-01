@@ -42,3 +42,16 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(rows[-1]["participant_id"], "'=1+1")
         self.assertEqual(json.loads(rows[-1]["details"])["text"], "è un volto")
         self.assertEqual(events[-1]["participant_id"], "=1+1")
+
+    def test_confidence_exports_values_and_preserves_missing_legacy_ratings(self):
+        current = record("current", "A", "recognition_response", details={
+            "response": "OLD", "target": "OLD", "correct": True, "response_time_ms": 425,
+            "confidence": 4, "confidence_response_time_ms": 850, "confidence_scale_version": 1})
+        legacy = record("legacy", "B", "recognition_response", details={"response": "NEW"})
+        rows = list(csv.DictReader(io.StringIO(csv_bytes([current, legacy]).decode("utf-8-sig"))))
+        self.assertEqual(rows[0]["confidence"], "4")
+        self.assertEqual(rows[0]["confidence_response_time_ms"], "850")
+        self.assertEqual(rows[0]["response_time_ms"], "425")
+        self.assertEqual(rows[0]["confidence_scale_version"], "1")
+        self.assertEqual(rows[1]["confidence"], "")
+        self.assertEqual(rows[1]["confidence_response_time_ms"], "")

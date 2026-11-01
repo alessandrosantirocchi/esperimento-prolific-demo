@@ -241,6 +241,8 @@ def render_dashboard():
                       "Risposta": details.get("response", ""),
                       "Atteso": details.get("target", ""), "Corretta": details.get("correct", ""),
                       "Tempo stimato (ms)": details.get("response_time_ms", ""),
+                      "Confidenza (1–5)": details.get("confidence", ""),
+                      "Tempo confidenza (ms)": details.get("confidence_response_time_ms", ""),
                       "Ricevuta dal server (UTC)": event.get("server_received_ts", "")})
     st.dataframe(table, width="stretch", hide_index=True)
     if len(memory) > 500:

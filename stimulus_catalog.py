@@ -182,6 +182,7 @@ def display_post(record):
 
 def public_history(events):
     detail_fields = {"method", "text", "length", "username", "page", "response",
+                     "confidence", "confidence_response_time_ms", "confidence_scale_version",
                      "response_time_ms", "displayed_client_ts", "threshold", "visibility_basis", "visible_height_px",
                      "tracking_version", "exposure_id", "exposure_index", "started_client_ts", "duration_ms", "closed", "reason", "action_id"}
     rows = []

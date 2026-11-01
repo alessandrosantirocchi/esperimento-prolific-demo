@@ -9,7 +9,8 @@ EVENT_COLUMNS = (
     "session_id", "event_id", "participant_id", *DEMOGRAPHIC_FIELDS, "event_type", "post_id",
     "stimulus_id", "filename", "source_type", "gender", "stimulus_type", "feed_position", "client_ts", "server_received_ts", "phase",
     "trial_id", "response", "target", "correct", "response_time_ms",
-    "displayed_client_ts", "elapsed_ms", "details",
+    "displayed_client_ts", "elapsed_ms", "confidence", "confidence_response_time_ms",
+    "confidence_scale_version", "details",
 )
 REACTION_TYPES = {"like", "unlike", "dislike", "remove_dislike"}
 REACTION_COLUMNS = (
