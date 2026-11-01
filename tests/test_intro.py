@@ -32,6 +32,9 @@ class IntroductionTests(unittest.TestCase):
         deleted = patch("event_store.is_session_deleted", return_value=False)
         deleted.start()
         self.addCleanup(deleted.stop)
+        prefetch = patch("image_assets.prefetch_images")
+        self.prefetch_loader = prefetch.start()
+        self.addCleanup(prefetch.stop)
 
     def complete_details(self, app, gender="woman", age=24, education="bachelor", start_feed=True):
         next(s for s in app.selectbox if s.key == "demographic_gender").set_value(gender)
@@ -203,6 +206,7 @@ class IntroductionTests(unittest.TestCase):
             by_id = {record["id"]: record for record in self.catalog.records}
             paths = lambda ids: {self.catalog.base / by_id[i]["image"] for i in ids}
             self.assertEqual({call.args[0] for call in image_loader.call_args_list}, paths(selection["feed"]))
+            self.prefetch_loader.assert_called_with([self.catalog.base / by_id[i]["image"] for i in selection["new"]])
             plan = list(app.session_state["recognition_plan"])
             order = list(app.session_state["feed_post_order"])
             image_loader.reset_mock()
@@ -213,6 +217,32 @@ class IntroductionTests(unittest.TestCase):
             self.assertEqual({call.args[0] for call in image_loader.call_args_list}, paths(selection["feed"] + selection["new"]))
             self.assertEqual(app.session_state["recognition_plan"], plan)
             self.assertEqual(app.session_state["feed_post_order"], order)
+
+    def test_memory_preparation_failure_keeps_instructions_and_can_be_retried(self):
+        app = AppTest.from_file(str(APP)).run()
+        app.checkbox[0].check().run()
+        app.button[0].click().run()
+        self.complete_details(app)
+        plan = list(app.session_state["recognition_plan"])
+        from image_assets import prepare_images
+
+        def fail_memory(paths):
+            if len(paths) == 60:
+                raise OSError("Temporary image preparation failure")
+            return prepare_images(paths)
+
+        app.session_state["experiment_phase"] = "recognition_intro"
+        with patch("image_assets.prepare_images", side_effect=fail_memory):
+            app.run()
+        self.assertFalse(app.exception)
+        self.assertEqual(app.title[0].value, "Hai già visto questo volto?")
+        self.assertEqual(len(app.error), 1)
+        self.assertFalse(any(b.label == "Inizia il riconoscimento" for b in app.button))
+        next(b for b in app.button if b.label == "Riprova aggiornamento").click().run()
+        self.assertFalse(app.exception)
+        self.assertEqual(len(app.error), 0)
+        self.assertTrue(any(b.label == "Inizia il riconoscimento" for b in app.button))
+        self.assertEqual(app.session_state["recognition_plan"], plan)
 
     def test_cached_image_module_without_batch_helper_can_run_both_phases(self):
         legacy = ModuleType("image_assets")

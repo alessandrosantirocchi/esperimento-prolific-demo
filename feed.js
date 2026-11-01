@@ -74,6 +74,7 @@ export default function (component) {
   }
   s.disliked ||= new Set();
   s.commentDrafts ||= {};
+  s.transitionPending ||= !recognition && recovered.some(e=>e.event_type==='begin_recognition');
   if(!recognition)s.tab='home';
 
   let observer;
@@ -158,7 +159,7 @@ export default function (component) {
         <p class="recognition-status" aria-live="polite">${s.choice?'Risposta selezionata. Salvataggio in corso…':'Scegli OLD se hai visto il volto nel feed precedente, NEW se è nuovo.'}</p>
       </article></main></div>`;
   };
-  const home = () => `<div class="feed-area"><main class="timeline"><div class="post-list">${posts.map(post).join('')}</div><div class="end-feed"><div class="end-check">${ico('check')}</div><strong>Hai raggiunto la fine del feed</strong>${data?.phase==='feed'?`<span class="feed-progress" aria-live="polite">Volti visualizzati: ${posts.length-(data.missing_post_ids?.length ?? posts.length)} di ${posts.length}</span><span>${data.phase1_ready?'Puoi proseguire.':'Manca la visualizzazione di alcuni volti o il loro salvataggio è ancora in corso.'}</span>${!data.phase1_ready && data.missing_post_ids?.length?'<button class="review-unseen" data-action="review_unseen">Mostra il prossimo volto da visualizzare</button>':''}<button class="phase-next" data-action="begin_recognition" ${data.phase1_ready?'':'disabled'}>Continua</button>`:'<span>Fine dell’anteprima del feed.</span>'}</div></main></div>`;
+  const home = () => `<div class="feed-area"><main class="timeline"><div class="post-list">${posts.map(post).join('')}</div><div class="end-feed"><div class="end-check">${ico('check')}</div><strong>Hai raggiunto la fine del feed</strong>${data?.phase==='feed'?`<span class="feed-progress" aria-live="polite">Volti visualizzati: ${posts.length-(data.missing_post_ids?.length ?? posts.length)} di ${posts.length}</span><span>${data.phase1_ready?'Puoi proseguire.':'Manca la visualizzazione di alcuni volti o il loro salvataggio è ancora in corso.'}</span>${!data.phase1_ready && data.missing_post_ids?.length?'<button class="review-unseen" data-action="review_unseen">Mostra il prossimo volto da visualizzare</button>':''}${s.transitionPending?'<span class="feed-transition-status" role="status" aria-live="polite">Aggiornamento del feed…</span>':''}<button class="phase-next" data-action="begin_recognition" ${data.phase1_ready&&!s.transitionPending?'':'disabled'}>Continua</button>`:'<span>Fine dell’anteprima del feed.</span>'}</div></main></div>`;
   const explore = (savedOnly=false) => `<section class="other-page"><header class="other-header"><h2>${savedOnly?'Elementi salvati':'Esplora'}</h2><p>${savedOnly?'I post che hai salvato':'Scopri i post della simulazione'}</p></header><div class="explore-grid">${posts.filter(p=>!savedOnly||s.saved.has(p.id)).map(p=>`<button class="explore-tile" data-action="open_post" data-post="${escape(p.id)}"><img src="${escape(p.image_url)}" alt=""/><span>${ico('heart',true,18)} ${shorten(Number(p.initial_likes)||0)}</span></button>`).join('')||'<div class="empty-state">Non hai ancora salvato nessun post.</div>'}</div></section>`;
   const search = () => `<section class="other-page"><header class="other-header"><h2>Cerca</h2><p>Cerca profili e post dimostrativi</p></header><div class="search-box">${ico('search')}<input autofocus class="search-input" type="search" placeholder="Cerca" value="${escape(s.query)}" aria-label="Cerca nel feed" /></div><div class="search-results">${posts.filter(p=>p.username.toLowerCase().includes(s.query.toLowerCase())||p.caption.toLowerCase().includes(s.query.toLowerCase())).map(p=>`<button class="search-result" data-action="open_post" data-post="${escape(p.id)}">${profileAvatar(p.avatar_url)}<span><strong>${escape(p.username)}</strong><small>${escape(p.location)}</small></span>${ico('chevron',false,18)}</button>`).join('')}</div></section>`;
   const profile = () => `<section class="other-page profile-page"><div class="profile-header"><span class="large-avatar">${ico('profile',false,48)}</span><div><div class="profile-username">you.research <span class="demo-tag">Account demo</span></div><div class="profile-stats"><span><strong>0</strong> post</span><span><strong>0</strong> follower</span><span><strong>${s.followed.size}</strong> seguiti</span></div><p>Profilo di simulazione per studi di ricerca.</p></div></div><div class="profile-tabs"><button class="active">${ico('grid',false,17)} Post</button><button data-action="nav" data-tab="saved">${ico('bookmark',false,17)} Elementi salvati</button></div><div class="empty-state">I post del feed sono esempi, non appartengono a questo profilo.</div></section>`;
@@ -307,7 +308,11 @@ export default function (component) {
       signal('recognition_response',id,{response:s.choice,response_time_ms:Math.round(performance.now()-s.shownAt),displayed_client_ts:s.shownAtClient});
       render();return;
     }
-    if(action==='begin_recognition') {if(data?.phase1_ready){tracker?.finalize();signal('begin_recognition');}return;}
+    if(s.transitionPending)return;
+    if(action==='begin_recognition') {
+      if(data?.phase1_ready){s.transitionPending=true;tracker?.finalize();signal('begin_recognition');render();}
+      return;
+    }
     if(action==='review_unseen') {
       const missingId=data?.missing_post_ids?.[0];
       const target=missingId && root.querySelector(`article[data-post="${CSS.escape(missingId)}"] .photo-wrap`);
@@ -351,6 +356,7 @@ export default function (component) {
   root.onsubmit = (e) => {
     const form=e.target.closest('form[data-comment-post]'); if(!form)return;
     e.preventDefault();
+    if(!recognition && s.transitionPending)return;
     const id=form.dataset.commentPost, input=form.querySelector('input');
     const value=(input?.value||'').trim(); if(!value)return;
     socialActionId = feedEventId();

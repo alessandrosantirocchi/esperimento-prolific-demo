@@ -1,13 +1,15 @@
 """Cached display derivatives. Original stimulus files are never overwritten."""
 
 import base64
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
 
 from PIL import Image, ImageOps
+
+_PREFETCH_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="feed-image-prefetch")
 
 
 @dataclass(frozen=True)
@@ -33,6 +35,22 @@ def prepare_images(paths: list[Path]) -> list[DisplayImage]:
         return []
     with ThreadPoolExecutor(max_workers=min(2, len(paths))) as executor:
         return list(executor.map(prepare_image, paths))
+
+
+def prefetch_images(paths: list[Path]) -> Future:
+    """Warm only the server cache; repeated requests share a bounded background job."""
+    signature = tuple((str(path.resolve()), path.stat().st_mtime_ns, path.stat().st_size) for path in paths)
+    return _prefetch(signature)
+
+
+@lru_cache(maxsize=32)
+def _prefetch(signature: tuple) -> Future:
+    return _PREFETCH_EXECUTOR.submit(_warm_images, signature)
+
+
+def _warm_images(signature: tuple) -> None:
+    # Do not retain a second copy of all image URLs in the completed Future.
+    prepare_images([Path(filename) for filename, _, _ in signature])
 
 
 @lru_cache(maxsize=256)

@@ -6,7 +6,7 @@ import unittest
 
 from PIL import Image
 
-from image_assets import prepare_image, prepare_images
+from image_assets import prepare_image, prepare_images, prefetch_images
 from stimulus_catalog import load_catalog, select_sets
 import random
 
@@ -67,3 +67,17 @@ class ImageAssetTests(unittest.TestCase):
             self.assertEqual(prepare_images([]), [])
             with self.assertRaises(FileNotFoundError):
                 prepare_images([paths[0], Path(folder) / "missing.png"])
+
+    def test_prefetch_is_shared_and_refreshes_after_a_file_change(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "face.png"
+            Image.new("RGB", (64, 64), "red").save(path)
+            first = prefetch_images([path])
+            self.assertIs(first, prefetch_images([path]))
+            self.assertIsNone(first.result(timeout=10))
+            red = prepare_image(path)
+            Image.new("RGB", (64, 64), "blue").save(path)
+            second = prefetch_images([path])
+            self.assertIsNot(first, second)
+            second.result(timeout=10)
+            self.assertNotEqual(red.url, prepare_image(path).url)

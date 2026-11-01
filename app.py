@@ -53,6 +53,11 @@ st.markdown(
       .st-key-instalab_main_feed { opacity: 1 !important; transition: none !important; }
       .st-key-recognition_info {max-width:700px;margin:48px auto;padding:24px;color:#202027;}
       .st-key-recognition_info h1, .st-key-recognition_info p {color:#202027;}
+      [data-testid="stSpinner"] {position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+        z-index:10000;width:max-content;max-width:calc(100vw - 32px);padding:16px 20px;
+        border:1px solid #e4e6ec;border-radius:14px;background:#fff;color:#202027;
+        box-shadow:0 8px 32px #20202718;}
+      [data-testid="stSpinner"] p {color:#202027;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -62,7 +67,7 @@ st.markdown(
 def load_stimuli(catalog, selection, include_new_images=False) -> dict:
     by_id = {record["id"]: record for record in catalog.records}
     # Reserve every stimulus up front, but defer encoding the unseen memory
-    # faces until the transition to recognition. Metadata and assignments stay
+    # faces until needed (or warm them in the background). Assignments stay
     # identical; all memory assets are ready before its first trial is shown.
     image_ids = selection["feed"] + (selection["new"] if include_new_images else [])
     image_paths = [catalog.base / by_id[i]["image"] for i in image_ids]
@@ -413,7 +418,7 @@ try:
             st.error("La configurazione dello studio è cambiata. Ricarica la pagina per iniziare una nuova sessione.")
             st.stop()
         study = load_stimuli(catalog, st.session_state.stimulus_selection,
-                             include_new_images=st.session_state.get("experiment_phase", "feed") != "feed")
+                             include_new_images=st.session_state.get("experiment_phase", "feed") == "recognition")
 except (CatalogError, OSError, ValueError, KeyError):
     st.error("Non è stato possibile preparare le fotografie. Il ricercatore deve verificare la configurazione degli stimoli.")
     st.stop()
@@ -441,6 +446,16 @@ if phase == "recognition_intro":
         st.write("Ora vedrai alcuni volti del feed precedente insieme a volti nuovi. Per ogni fotografia, indica se ricordi di averla vista nella prima parte.")
         st.markdown("**OLD — Già visto:** il volto era presente nel feed precedente.\n\n**NEW — Nuovo:** il volto non era presente nel feed precedente.")
         st.write("Scegli una sola risposta per ogni volto. Dopo la scelta passerai alla fotografia successiva. Non verrà mostrato se la risposta è corretta.")
+        # Show the instructions before any outstanding image preparation, so a
+        # cold server never leaves the participant waiting at the end of the feed.
+        try:
+            with st.spinner("Aggiornamento del feed…"):
+                load_stimuli(catalog, st.session_state.stimulus_selection, include_new_images=True)
+        except (OSError, ValueError, KeyError):
+            st.error("Non è stato possibile aggiornare il feed. Riprova senza chiudere la pagina.")
+            if st.button("Riprova aggiornamento"):
+                st.rerun()
+            st.stop()
         if st.button("Inizia il riconoscimento", type="primary"):
             event = {"event_id": "recognition_started", "event_type": "recognition_started",
                      "participant_id": participant_id, "session_id": st.session_state.recording_session_id,
@@ -534,6 +549,16 @@ response = feed_component(
     on_events_change=lambda: None,
     width="stretch",
 )
+
+# Speculative server-side preparation does not expose NEW faces to the browser
+# and does not touch session state, events, or clocks in the background thread.
+if phase == "feed":
+    prefetch = getattr(image_assets, "prefetch_images", None)
+    if prefetch is not None:
+        try:
+            prefetch([catalog.base / post["image"] for post in study["recognition_new_posts"]])
+        except (OSError, ValueError):
+            pass  # Foreground validation/preparation will report any asset issue.
 
 # Acknowledge events in session state only after the database transaction commits.
 new_events = response.events or []
