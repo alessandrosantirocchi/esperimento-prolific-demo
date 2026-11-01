@@ -401,7 +401,7 @@ if not st.session_state.get("feed_instructions_completed", False) and not st.ses
 participant_details = st.session_state.get("participant_demographics", {})
 
 try:
-    with st.spinner("Preparazione delle fotografie…"):
+    with st.spinner("Aggiornamento del feed…"):
         catalog = load_catalog(BASE)
         if "stimulus_selection" not in st.session_state:
             if st.session_state.get("recording_initialized", False):
