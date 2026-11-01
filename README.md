@@ -1,4 +1,4 @@
-# InstaLab — feed social e riconoscimento di volti
+# Social Feed — feed social e riconoscimento di volti
 
 Applicazione Streamlit con un feed ispirato a Instagram, reazioni like/dislike, commenti e successivo compito di memoria OLD/NEW. Non usa account, API o dati di Instagram. Il protocollo prevede 30 volti nel feed e 60 prove di memoria, con quote uguali per categoria e genere.
 

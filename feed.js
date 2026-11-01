@@ -1,4 +1,4 @@
-// InstaLab — social feed simulator. Stimuli come from stimuli.csv and images/.
+// Social Feed — social feed simulator. Stimuli come from stimuli.csv and images/.
 // No real Instagram API, accounts, or external communication.
 export default function (component) {
   const { parentElement, data, setStateValue } = component;
@@ -178,7 +178,7 @@ export default function (component) {
     const p=postBy(s.overlayPost);
     const title={post_more:'Opzioni del post',more:'Informazioni'}[s.overlay]||'Informazioni';
     return `<div class="overlay" data-close-overlay="true"><div class="simple-modal" role="dialog" aria-label="${title}"><h3>${title}</h3>
-      ${s.overlay==='post_more' ? `<button class="modal-option" data-action="save" data-post="${escape(s.overlayPost)}">${ico('bookmark',false,20)} Salva / Rimuovi dai salvati</button>` : '<p>InstaLab è un prototipo per esperimenti sulla percezione dei contenuti social. Nessun collegamento reale con Instagram.</p>'}
+      ${s.overlay==='post_more' ? `<button class="modal-option" data-action="save" data-post="${escape(s.overlayPost)}">${ico('bookmark',false,20)} Salva / Rimuovi dai salvati</button>` : '<p>Social Feed è un prototipo per esperimenti sulla percezione dei contenuti social. Nessun collegamento reale con Instagram.</p>'}
        <button class="cancel" data-action="close">Annulla</button></div></div>`;
   };
 

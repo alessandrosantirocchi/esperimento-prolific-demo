@@ -1,4 +1,4 @@
-"""InstaLab: Instagram-inspired research-feed prototype for Streamlit.
+"""Social Feed: Instagram-inspired research-feed prototype for Streamlit.
 
 Customize the visual layout in styles.css, interactions in feed.js,
 and the stimulus catalog in stimuli.csv and images/. Events are stored in SQLite.
@@ -28,7 +28,7 @@ from stimulus_catalog import (load_catalog, select_sets, CatalogError, METADATA_
 BASE = Path(__file__).resolve().parent
 FEED_INTERFACE_VERSION = "clean-feed-v2"
 st.set_page_config(
-    page_title="InstaLab | Social Feed Simulation",
+    page_title="Social Feed | Faces in the Digital Age",
     page_icon="📷",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -61,7 +61,7 @@ st.markdown(
 
 def load_stimuli(catalog, selection) -> dict:
     by_id = {record["id"]: record for record in catalog.records}
-    study = {"posts": [], "recognition_new_posts": [], "stories": [], "display_name": "InstaLab"}
+    study = {"posts": [], "recognition_new_posts": [], "stories": [], "display_name": "Social Feed"}
     for key, destination in (("feed", "posts"), ("new", "recognition_new_posts")):
         for index, identifier in enumerate(selection[key], 1):
             record = by_id[identifier]
@@ -174,7 +174,7 @@ if not st.session_state.get("intro_consent_accepted", False):
     )
     with st.container(key="study_intro"):
         st.markdown(
-            '<div class="intro-topline"><div class="intro-brand">InstaLab<span> ●</span></div>'
+            '<div class="intro-topline"><div class="intro-brand">Social Feed<span> ●</span></div>'
             '<span class="intro-demo">Versione dimostrativa</span></div>', unsafe_allow_html=True,
         )
         st.title("Faces in the Digital Age")
@@ -363,7 +363,7 @@ if not st.session_state.get("feed_instructions_completed", False) and not st.ses
         </style>
     """, unsafe_allow_html=True)
     with st.container(key="feed_instructions"):
-        st.markdown('<div class="feed-guide-brand">InstaLab<span> ●</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="feed-guide-brand">Social Feed<span> ●</span></div>', unsafe_allow_html=True)
         st.title("Prima di aprire il feed")
         st.write("Immagina di aprire Instagram: troverai un feed di post con fotografie di volti di persone.")
         st.markdown("""
@@ -512,7 +512,7 @@ response = feed_component(
         "missing_post_ids": missing_post_ids,
         "trial_number": len(answered_ids) + 1,
         "trial_total": len(st.session_state.recognition_plan),
-        "title": study.get("display_name", "InstaLab"),
+        "title": study.get("display_name", "Social Feed"),
         "participant_id": participant_id,
         "session_id": st.session_state.recording_session_id,
         "history": public_history(st.session_state.feed_events),
