@@ -31,11 +31,15 @@ class IntroductionTests(unittest.TestCase):
         deleted.start()
         self.addCleanup(deleted.stop)
 
-    def complete_details(self, app, gender="woman", age=24, education="bachelor"):
+    def complete_details(self, app, gender="woman", age=24, education="bachelor", start_feed=True):
         next(s for s in app.selectbox if s.key == "demographic_gender").set_value(gender)
         app.number_input[0].set_value(age)
         next(s for s in app.selectbox if s.key == "demographic_education").set_value(education)
-        next(b for b in app.button if b.label == "Continua al feed").click().run()
+        next(b for b in app.button if b.label == "Continua").click().run()
+        if start_feed:
+            button = next((b for b in app.button if b.key == "start_feed_button"), None)
+            if button:
+                button.click().run()
 
     def test_consent_is_required_and_can_be_unchecked(self):
         app = AppTest.from_file(str(APP)).run()
@@ -107,6 +111,7 @@ class IntroductionTests(unittest.TestCase):
         del app.session_state["participant_id"]
         del app.session_state["participant_demographics"]
         del app.session_state["demographics_completed"]
+        del app.session_state["feed_instructions_completed"]
         app.session_state["intro_consent_participant_id"] = "LEGACY_PARTICIPANT"
         app.session_state["feed_events"] = [{**e, "participant_id":"LEGACY_PARTICIPANT"} for e in app.session_state["feed_events"]]
         calls = self.storage.call_count
@@ -115,6 +120,43 @@ class IntroductionTests(unittest.TestCase):
         self.assertEqual(app.session_state["participant_id"], "LEGACY_PARTICIPANT")
         self.assertEqual(app.session_state["recording_session_id"], session)
         self.assertEqual(self.storage.call_count, calls)
+        self.assertFalse(any(b.key == "start_feed_button" for b in app.button))
+
+    def test_feed_instructions_follow_demographics_before_faces_and_timers(self):
+        app = AppTest.from_file(str(APP)).run()
+        app.checkbox[0].check().run()
+        app.button[0].click().run()
+        participant = app.session_state["participant_id"]
+        session = app.session_state["recording_session_id"]
+        self.complete_details(app, start_feed=False)
+        self.assertFalse(app.exception)
+        self.assertEqual(app.title[0].value, "Prima di aprire il feed")
+        self.catalog_loader.assert_not_called()
+        self.assertNotIn("stimulus_selection", app.session_state)
+        self.assertNotIn("recognition_plan", app.session_state)
+        self.assertEqual([e["event_type"] for e in app.session_state["feed_events"]], ["demographics_submitted"])
+        text = " ".join(item.value for item in app.markdown)
+        for label in ("Scorri al tuo ritmo", "Like", "Dislike", "commento", "seconda fase"):
+            self.assertIn(label, text)
+        for spoiler in ("OLD", "NEW", "riconoscimento", "memoria", "GAN", "Transformer"):
+            self.assertNotIn(spoiler, text)
+        calls = self.storage.call_count
+        app.run()
+        self.assertEqual(app.title[0].value, "Prima di aprire il feed")
+        self.assertEqual(self.storage.call_count, calls)
+        self.catalog_loader.assert_not_called()
+        next(b for b in app.button if b.key == "start_feed_button").click().run()
+        self.assertFalse(app.exception)
+        self.assertTrue(app.session_state["feed_instructions_completed"])
+        self.assertEqual(app.session_state["participant_id"], participant)
+        self.assertEqual(app.session_state["recording_session_id"], session)
+        self.assertEqual(len(app.session_state["feed_post_order"]), 30)
+        self.assertEqual(len(app.session_state["recognition_plan"]), 60)
+        order = list(app.session_state["feed_post_order"])
+        app.run()
+        self.assertFalse(any(b.key == "start_feed_button" for b in app.button))
+        self.assertEqual(app.session_state["feed_post_order"], order)
+        self.assertEqual(len([e for e in app.session_state["feed_events"] if e["event_type"] == "demographics_submitted"]), 1)
 
     def test_demographics_are_required_between_consent_and_feed(self):
         app = AppTest.from_file(str(APP)).run()
@@ -175,6 +217,9 @@ class IntroductionTests(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertEqual(len(app.error), 0)
         self.assertEqual(app.session_state["feed_events"][0]["event_type"], "demographics_submitted")
+        self.assertEqual(app.title[0].value, "Prima di aprire il feed")
+        self.assertFalse(any(e["event_type"] == "session_started" for e in app.session_state["feed_events"]))
+        next(b for b in app.button if b.key == "start_feed_button").click().run()
         self.assertEqual(len([e for e in app.session_state["feed_events"] if e["event_type"] == "session_started"]), 1)
 
     def test_failed_feed_start_does_not_resubmit_saved_demographics(self):

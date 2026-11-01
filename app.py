@@ -304,7 +304,7 @@ if not st.session_state.get("demographics_completed", False) and not st.session_
                                      format_func=EDUCATION_OPTIONS.get, placeholder="Seleziona una risposta",
                                      help="Indica un titolo già completato, anche se stai ancora studiando.",
                                      key="demographic_education")
-            submitted = st.form_submit_button("Continua al feed", type="primary", width="stretch")
+            submitted = st.form_submit_button("Continua", type="primary", width="stretch")
         if submitted:
             try:
                 values = validate_demographics(gender, age, education)
@@ -322,13 +322,69 @@ if not st.session_state.get("demographics_completed", False) and not st.session_
                     st.session_state.recording_deleted = True
                     st.rerun()
                 except (sqlite3.Error, OSError):
-                    st.error("Non è stato possibile salvare le risposte. Riprova con Continua al feed senza chiudere la pagina.")
+                    st.error("Non è stato possibile salvare le risposte. Riprova con Continua senza chiudere la pagina.")
                 else:
                     st.session_state.participant_demographics = values
                     st.session_state.demographics_completed = True
                     st.session_state.feed_events.append(event)
                     st.session_state.seen_event_ids.add(event["event_id"])
                     st.rerun()
+    st.stop()
+
+# Explain the feed again after the questionnaire, before loading any faces or
+# starting behavioral tracking. Already-running sessions keep their current place.
+if not st.session_state.get("feed_instructions_completed", False) and not st.session_state.get("recording_initialized", False):
+    st.markdown("""
+        <style>
+          .st-key-feed_instructions {width:min(100% - 24px,660px);margin:32px auto;padding:32px;
+            border:1px solid #e9e9f0;border-radius:24px;background:#fff;color:#202027;
+            box-shadow:0 18px 64px #28203909;color-scheme:light;}
+          .st-key-feed_instructions h1 {font-size:clamp(1.8rem,5vw,2.4rem);letter-spacing:-.04em;
+            line-height:1.15;padding:0 0 16px;}
+          .st-key-feed_instructions h1,.st-key-feed_instructions p {color:#202027;}
+          .st-key-feed_instructions p {line-height:1.65;}
+          .st-key-feed_instructions .feed-guide-brand {font-weight:750;color:#34313c;margin-bottom:20px;}
+          .st-key-feed_instructions .feed-guide-brand span {color:#f24d81;}
+          .st-key-feed_instructions .feed-guide {display:grid;gap:12px;margin:22px 0;}
+          .st-key-feed_instructions .feed-guide-step {display:flex;align-items:flex-start;gap:14px;
+            padding:18px;border:1px solid #ececf2;border-radius:16px;background:#fcfcfe;}
+          .st-key-feed_instructions .feed-guide-icon {display:flex;align-items:center;justify-content:center;
+            flex-shrink:0;width:40px;height:40px;border-radius:12px;background:#edf5ff;color:#2866b1;}
+          .st-key-feed_instructions .feed-guide-social {background:#fff0f5;color:#ce2861;}
+          .st-key-feed_instructions .feed-guide-step h2 {font-size:1rem;line-height:1.4;padding:0;margin:0 0 5px;color:#202027;}
+          .st-key-feed_instructions .feed-guide-step p {font-size:.94rem;color:#525261;margin:0;}
+          .st-key-feed_instructions button[kind="primary"] {background:#007bc4;border-color:#007bc4;
+            border-radius:12px;min-height:48px;}
+          .st-key-feed_instructions button[kind="primary"] p {color:#fff;}
+          @media(max-width:640px){
+            .st-key-feed_instructions {margin:12px auto;padding:24px 18px;border-radius:18px;}
+            .st-key-feed_instructions .feed-guide-step {padding:14px;gap:12px;}
+          }
+        </style>
+    """, unsafe_allow_html=True)
+    with st.container(key="feed_instructions"):
+        st.markdown('<div class="feed-guide-brand">InstaLab<span> ●</span></div>', unsafe_allow_html=True)
+        st.title("Prima di aprire il feed")
+        st.write("Immagina di aprire Instagram: troverai un feed di post con fotografie di volti di persone.")
+        st.markdown("""
+            <div class="feed-guide" role="list" aria-label="Come usare il feed">
+              <div class="feed-guide-step" role="listitem">
+                <span class="feed-guide-icon"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v18m-5-5 5 5 5-5M17 3h4M17 8h4M17 13h4"/></svg></span>
+                <div><h2>Scorri al tuo ritmo</h2><p>Guarda i post e scorri fino alla fine del feed, come faresti normalmente su un social.</p></div>
+              </div>
+              <div class="feed-guide-step" role="listitem">
+                <span class="feed-guide-icon feed-guide-social"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.4 5.4 0 0 0-7.7 0L12 5.7l-1.1-1.1a5.4 5.4 0 0 0-7.7 7.7L12 21l8.8-8.7a5.4 5.4 0 0 0 0-7.7z"/></svg></span>
+                <div><h2>Interagisci liberamente</h2><p>Puoi mettere Like o Dislike, lasciare un commento o salvare un post. Puoi anche passare oltre senza reagire.</p></div>
+              </div>
+              <div class="feed-guide-step" role="listitem">
+                <span class="feed-guide-icon"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></span>
+                <div><h2>Quando hai finito</h2><p>In fondo al feed premi <strong>Continua</strong>. Seguirà una seconda fase: riceverai nuove istruzioni prima di iniziarla.</p></div>
+              </div>
+            </div>
+        """, unsafe_allow_html=True)
+        if st.button("Ho capito — Apri il feed", key="start_feed_button", type="primary", width="stretch"):
+            st.session_state.feed_instructions_completed = True
+            st.rerun()
     st.stop()
 
 participant_details = st.session_state.get("participant_demographics", {})

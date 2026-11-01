@@ -20,7 +20,7 @@ python -m streamlit run app.py
 
 Su Windows usare `python` al posto di `python3` e attivare l'ambiente con `.venv\Scripts\Activate.ps1` in PowerShell.
 
-Aprire l'indirizzo mostrato da Streamlit, senza aggiungere identificativi al link. Accettare il consenso, compilare i dati del partecipante, scorrere tutti i volti, premere **Continua**, leggere le istruzioni e avviare il riconoscimento. Per una nuova sessione ricaricare la pagina. Non è implementata la ripresa di una sessione interrotta.
+Aprire l'indirizzo mostrato da Streamlit, senza aggiungere identificativi al link. Accettare il consenso, compilare i dati del partecipante, leggere il riepilogo delle istruzioni e premere **Ho capito — Apri il feed**. Scorrere tutti i volti, premere **Continua**, leggere le nuove istruzioni e avviare il riconoscimento. Per una nuova sessione ricaricare la pagina. Non è implementata la ripresa di una sessione interrotta.
 
 ### Raccolta tramite un link pubblico
 
@@ -32,7 +32,7 @@ I risultati storici non vengono riscritti. Se durante un aggiornamento è ancora
 
 ### Dati del partecipante dopo il consenso
 
-La sequenza delle nuove sessioni è **consenso → dati del partecipante → feed → riconoscimento**. Prima di mostrare o selezionare i volti viene presentato un modulo con tre campi senza risposte preselezionate:
+La sequenza delle nuove sessioni è **consenso → dati del partecipante → istruzioni del feed → feed → istruzioni di memoria → riconoscimento**. Prima di mostrare o selezionare i volti viene presentato un modulo con tre campi senza risposte preselezionate:
 
 | Campo esportato | Risposta |
 |---|---|
@@ -42,7 +42,7 @@ La sequenza delle nuove sessioni è **consenso → dati del partecipante → fee
 
 Si richiede il titolo più alto **già conseguito**, anche per chi sta ancora studiando. Il controllo numerico dell'età non introduce un criterio di ammissione per età; eventuali requisiti di partecipazione devono essere definiti nelle informazioni sullo studio. Il modulo richiede i tre campi e consente le scelte esplicite di non risposta per genere e istruzione.
 
-**Continua al feed** valida e salva le risposte nell'evento `demographics_submitted`, associato a `participant_id`, `session_id` e timestamp del consenso. Solo dopo la transazione riuscita il modulo viene segnato come completato e si apre il feed. Un errore permette di riprovare mantenendo le risposte; gli ID fissi per sessione e la deduplicazione SQLite impediscono registrazioni doppie.
+**Continua** valida e salva le risposte nell'evento `demographics_submitted`, associato a `participant_id`, `session_id` e timestamp del consenso. Solo dopo la transazione riuscita il modulo viene segnato come completato e si apre il riepilogo **Prima di aprire il feed**, che ricorda di scorrere e interagire liberamente senza anticipare il compito di memoria. **Ho capito — Apri il feed** apre la prima fase: fino a quel momento non si caricano volti, non si assegnano gli stimoli e non partono i timer. La conferma resta nello stato della sessione durante i rerun; le sessioni già avviate proseguono dal punto raggiunto. Un errore di salvataggio delle anagrafiche permette di riprovare mantenendo le risposte; gli ID fissi per sessione e la deduplicazione SQLite impediscono registrazioni doppie.
 
 Le risposte vengono riportate negli export degli eventi, delle reazioni, della memoria e di `feed_metrics.csv`. Il download **Dati partecipanti (CSV)** nell'Area ricercatore produce `instalab_partecipanti.csv`, una riga per questionario salvato, con i due identificativi e `demographics_submitted_at`. I dati del partecipante e le metriche usano i filtri di partecipante/sessione/completamento, indipendentemente dal filtro Fase; quest'ultimo include anche **Dati partecipante** per il registro eventi.
 
