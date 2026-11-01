@@ -6,7 +6,7 @@ import unittest
 
 from PIL import Image
 
-from image_assets import prepare_image
+from image_assets import prepare_image, prepare_images
 from stimulus_catalog import load_catalog, select_sets
 import random
 
@@ -56,3 +56,14 @@ class ImageAssetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaises(FileNotFoundError):
                 prepare_image(Path(folder) / "missing.jpg")
+
+    def test_batch_preserves_order_and_the_existing_image_encoding(self):
+        with tempfile.TemporaryDirectory() as folder:
+            paths = [Path(folder) / f"{i}.png" for i in range(3)]
+            for path, color in zip(paths, ["red", "green", "blue"]):
+                Image.new("RGB", (64, 64), color).save(path)
+            batch = prepare_images(paths)
+            self.assertEqual(batch, [prepare_image(path) for path in paths])
+            self.assertEqual(prepare_images([]), [])
+            with self.assertRaises(FileNotFoundError):
+                prepare_images([paths[0], Path(folder) / "missing.png"])

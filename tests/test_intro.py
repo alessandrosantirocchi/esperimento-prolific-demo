@@ -11,6 +11,7 @@ import uuid
 from streamlit.testing.v1 import AppTest
 from catalog_fixture import create_catalog
 from stimulus_catalog import load_catalog, select_sets
+from image_assets import prepare_image
 
 
 APP = Path(__file__).resolve().parents[1] / "app.py"
@@ -187,6 +188,30 @@ class IntroductionTests(unittest.TestCase):
         self.assertEqual(len(selection["feed"]), 30)
         self.assertEqual(len(selection["new"]), 30)
         self.assertFalse(set(selection["feed"]) & set(selection["new"]))
+
+    def test_new_memory_images_are_prepared_only_after_the_feed(self):
+        with patch("image_assets.prepare_image", wraps=prepare_image) as image_loader:
+            app = AppTest.from_file(str(APP)).run()
+            app.checkbox[0].check().run()
+            app.button[0].click().run()
+            self.complete_details(app, start_feed=False)
+            image_loader.assert_not_called()
+            next(b for b in app.button if b.key == "start_feed_button").click().run()
+            self.assertFalse(app.exception)
+            selection = app.session_state["stimulus_selection"]
+            by_id = {record["id"]: record for record in self.catalog.records}
+            paths = lambda ids: {self.catalog.base / by_id[i]["image"] for i in ids}
+            self.assertEqual({call.args[0] for call in image_loader.call_args_list}, paths(selection["feed"]))
+            plan = list(app.session_state["recognition_plan"])
+            order = list(app.session_state["feed_post_order"])
+            image_loader.reset_mock()
+            app.session_state["experiment_phase"] = "recognition_intro"
+            app.run()
+            self.assertFalse(app.exception)
+            self.assertEqual(app.title[0].value, "Hai già visto questo volto?")
+            self.assertEqual({call.args[0] for call in image_loader.call_args_list}, paths(selection["feed"] + selection["new"]))
+            self.assertEqual(app.session_state["recognition_plan"], plan)
+            self.assertEqual(app.session_state["feed_post_order"], order)
 
     def test_previous_protocol_session_stops_before_adding_new_events(self):
         app = AppTest.from_file(str(APP)).run()

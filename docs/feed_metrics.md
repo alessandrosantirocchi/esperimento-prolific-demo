@@ -28,7 +28,9 @@ Ogni esposizione ha un ID stabile. L'inizio, i checkpoint ogni 2 secondi e la ch
 
 Il tracker vive al di fuori dei normali aggiornamenti del componente e viene riutilizzato per la stessa `session_id`. I rerun non azzerano il clock e non aprono nuove esposizioni se la foto resta sufficientemente visibile. La sostituzione del DOM durante il rendering non viene interpretata come una nuova esposizione.
 
-Le immagini del feed vengono conservate in una cache per sessione nel browser: dopo la conferma di avvio del tracker il server non reinvia tutte le immagini a ogni checkpoint. Il percorso di caricamento del riconoscimento resta quello precedente.
+Le immagini del feed vengono conservate in una cache per sessione nel browser: dopo la conferma di avvio del tracker il server non reinvia tutte le immagini a ogni checkpoint. Nel riconoscimento restano invariati il caricamento del volto corrente e il precaricamento dei due successivi.
+
+All'ingresso nel feed il server prepara soltanto le 30 immagini della prima fase. Le 30 NEW restano assegnate con tutti i metadati, ma vengono convertite al passaggio alle istruzioni di memoria; tutti gli asset del riconoscimento sono pronti prima della prima prova. La preparazione usa al massimo due worker, mantiene l'ordine e la stessa codifica WebP, con una cache limitata a 256 immagini. Un indicatore segnala la preparazione quando richiede tempo; il tracker parte soltanto quando il feed viene montato nel browser e l'immagine soddisfa i criteri di visibilità.
 
 Gli eventi non ancora confermati dal server sono conservati in un outbox nella `sessionStorage` della scheda e reinviati durante il ricollegamento del componente. Gli eventi confermati vengono rimossi dall'outbox. Se lo storage del browser è bloccato rimane la coda in memoria; lo storage non contiene immagini o la soluzione del riconoscimento. Il database conserva gli eventi solo dopo la transazione SQLite riuscita.
 

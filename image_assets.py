@@ -1,6 +1,7 @@
 """Cached display derivatives. Original stimulus files are never overwritten."""
 
 import base64
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import lru_cache
 from io import BytesIO
@@ -26,7 +27,15 @@ def prepare_image(path: Path, region: dict | None = None) -> DisplayImage:
     return _prepare(str(path), stamp.st_mtime_ns, stamp.st_size, crop)
 
 
-@lru_cache(maxsize=128)
+def prepare_images(paths: list[Path]) -> list[DisplayImage]:
+    """Prepare independent assets with bounded concurrency, retaining input order."""
+    if not paths:
+        return []
+    with ThreadPoolExecutor(max_workers=min(2, len(paths))) as executor:
+        return list(executor.map(prepare_image, paths))
+
+
+@lru_cache(maxsize=256)
 def _prepare(filename: str, mtime_ns: int, size: int, crop: tuple | None) -> DisplayImage:
     with Image.open(filename) as source:
         image = ImageOps.exif_transpose(source)

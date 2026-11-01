@@ -16,7 +16,7 @@ from pathlib import Path
 import streamlit as st
 from event_store import save_events, SessionDeletedError, is_session_deleted
 from recognition import make_plan, score_response
-from image_assets import prepare_image
+from image_assets import prepare_images
 from export_data import csv_bytes as export_csv
 from research_dashboard import render_dashboard
 from experiment_protocol import PROTOCOL_VERSION
@@ -59,13 +59,18 @@ st.markdown(
 )
 
 
-def load_stimuli(catalog, selection) -> dict:
+def load_stimuli(catalog, selection, include_new_images=False) -> dict:
     by_id = {record["id"]: record for record in catalog.records}
+    # Reserve every stimulus up front, but defer encoding the unseen memory
+    # faces until the transition to recognition. Metadata and assignments stay
+    # identical; all memory assets are ready before its first trial is shown.
+    image_ids = selection["feed"] + (selection["new"] if include_new_images else [])
+    assets = dict(zip(image_ids, prepare_images([catalog.base / by_id[i]["image"] for i in image_ids])))
     study = {"posts": [], "recognition_new_posts": [], "stories": [], "display_name": "Social Feed"}
     for key, destination in (("feed", "posts"), ("new", "recognition_new_posts")):
         for index, identifier in enumerate(selection[key], 1):
             record = by_id[identifier]
-            study[destination].append({**record, "image_url": prepare_image(catalog.base / record["image"]).url,
+            study[destination].append({**record, "image_url": assets[identifier].url if identifier in assets else "",
                                        "avatar_url": "", "username": f"profilo.{index:02}", "caption": "",
                                        "comments": [], "location": "", "initial_likes": 0,
                                        "minutes_ago": 30, "verified": False})
@@ -390,17 +395,19 @@ if not st.session_state.get("feed_instructions_completed", False) and not st.ses
 participant_details = st.session_state.get("participant_demographics", {})
 
 try:
-    catalog = load_catalog(BASE)
-    if "stimulus_selection" not in st.session_state:
-        if st.session_state.get("recording_initialized", False):
-            st.error("Gli stimoli sono cambiati. Ricarica la pagina per iniziare una nuova sessione.")
+    with st.spinner("Preparazione delle fotografie…"):
+        catalog = load_catalog(BASE)
+        if "stimulus_selection" not in st.session_state:
+            if st.session_state.get("recording_initialized", False):
+                st.error("Gli stimoli sono cambiati. Ricarica la pagina per iniziare una nuova sessione.")
+                st.stop()
+            st.session_state.stimulus_selection = select_sets(catalog)
+        if (st.session_state.stimulus_selection.get("protocol_version") != PROTOCOL_VERSION
+                or st.session_state.stimulus_selection["fingerprint"] != catalog.fingerprint):
+            st.error("La configurazione dello studio è cambiata. Ricarica la pagina per iniziare una nuova sessione.")
             st.stop()
-        st.session_state.stimulus_selection = select_sets(catalog)
-    if (st.session_state.stimulus_selection.get("protocol_version") != PROTOCOL_VERSION
-            or st.session_state.stimulus_selection["fingerprint"] != catalog.fingerprint):
-        st.error("La configurazione dello studio è cambiata. Ricarica la pagina per iniziare una nuova sessione.")
-        st.stop()
-    study = load_stimuli(catalog, st.session_state.stimulus_selection)
+        study = load_stimuli(catalog, st.session_state.stimulus_selection,
+                             include_new_images=st.session_state.get("experiment_phase", "feed") != "feed")
 except (CatalogError, OSError, ValueError, KeyError):
     st.error("Non è stato possibile preparare le fotografie. Il ricercatore deve verificare la configurazione degli stimoli.")
     st.stop()
